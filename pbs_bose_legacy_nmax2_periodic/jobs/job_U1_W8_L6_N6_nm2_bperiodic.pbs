@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -N bosepolfed_U1_W8_L6_N6_nm2_bpe
+#PBS -l walltime=24:00:00
+#PBS -l mem=8gb
+#PBS -l nodes=1:ppn=1
+#PBS -o /home/2/kj405942/POLFED_bosons/pbs_bose_legacy_nmax2_periodic/logs/U1_W8_L6_N6_nm2_bperiodic.out
+#PBS -e /home/2/kj405942/POLFED_bosons/pbs_bose_legacy_nmax2_periodic/logs/U1_W8_L6_N6_nm2_bperiodic.err
+#PBS -V
+
+set -euo pipefail
+echo "Job started on $(hostname) at $(date)"
+echo "PBS_JOBID=${PBS_JOBID:-unknown}"
+echo "PBS_O_WORKDIR=${PBS_O_WORKDIR:-unknown}"
+cd '/home/2/kj405942/POLFED_bosons'
+
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export JULIA_NUM_THREADS=1
+mkdir -p '/home/2/kj405942/POLFED_bosons/pbs_bose_legacy_nmax2_periodic/data/U_1/W_8/L_6/N_6_nmax_2/boundary_periodic'
+
+julia --project='.' 'run_bose_hubbard_polfed_N_fixed_nmax.jl' --L 6 --N 6 --nmax 2 --t 1 --U 1 --W 8 --nreal 300 --seed 1080060980 --howmany 500 --target 'middle' --block 4 --boundary 'periodic' --outdir '/home/2/kj405942/POLFED_bosons/pbs_bose_legacy_nmax2_periodic/data/U_1/W_8/L_6/N_6_nmax_2/boundary_periodic' --full
+echo "Job finished at $(date)"
