@@ -1,0 +1,5 @@
+pbs_bose_polfed_grouped/
+gap_ratio_bose_*/
+debug_bose_*/
+__pycache__/
+*.pyc
