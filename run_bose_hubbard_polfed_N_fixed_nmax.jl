@@ -30,7 +30,7 @@ function parse_commandline()
         "howmany" => 400,
         "target" => "middle",
         "block" => 4,
-        "boundary" => "open",
+        "boundary" => "periodic",
         "full" => false,
         "outdir" => "polfed_bose_hubbard_results",
         "save-fields" => false,
@@ -149,7 +149,7 @@ end
 
 function build_bose_hubbard_sparse(L::Int, N::Int, nmax::Int, t::Float64,
                                    U::Float64, eps::Vector{Float64};
-                                   boundary::String = "open")
+                                   boundary::String = "periodic")
     basis = generate_fixedN_occupations(L, N, nmax)
     dim = length(basis)
 
@@ -340,14 +340,14 @@ function main()
     dim_expected = length(generate_fixedN_occupations(L, N, nmax))
     mode_label = use_full ? "full" : "polfed"
 
-    filename = @sprintf("energies_%s_U%.6g_L%d_N%d_nmax%d_W%.6g_nreal%d.txt",
-                        mode_label, U, L, N, nmax, W, nreal)
+    filename = @sprintf("energies_%s_U%.6g_L%d_N%d_nmax%d_W%.6g_boundary%s_nreal%d.txt",
+                        mode_label, U, L, N, nmax, W, boundary, nreal)
     outfile = joinpath(outdir, filename)
     partial_outfile = replace(outfile, ".txt" => "_partial.txt")
-    fieldfile = joinpath(outdir, @sprintf("fields_U%.6g_L%d_N%d_nmax%d_W%.6g_nreal%d.txt",
-                                          U, L, N, nmax, W, nreal))
-    skipfile = joinpath(outdir, @sprintf("skipped_U%.6g_L%d_N%d_nmax%d_W%.6g_nreal%d.txt",
-                                         U, L, N, nmax, W, nreal))
+    fieldfile = joinpath(outdir, @sprintf("fields_U%.6g_L%d_N%d_nmax%d_W%.6g_boundary%s_nreal%d.txt",
+                                          U, L, N, nmax, W, boundary, nreal))
+    skipfile = joinpath(outdir, @sprintf("skipped_U%.6g_L%d_N%d_nmax%d_W%.6g_boundary%s_nreal%d.txt",
+                                         U, L, N, nmax, W, boundary, nreal))
 
     @printf("Bose-Hubbard: L=%d, N=%d, nmax=%d, dim=%d\n", L, N, nmax, dim_expected)
     @printf("t=%.8g, U=%.8g, W=%.8g, nreal=%d, boundary=%s, mode=%s\n",

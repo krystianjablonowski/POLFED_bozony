@@ -8,8 +8,8 @@ or submit_bose_polfed_pbs_grouped_nmax.pl:
   pbs_polfed_grouped/data/U_4p0/W_6p0/L_9/Nup_5_Ndown_4/
       energies_polfed_U4_L9_Nup5_Ndown4_W6_nreal400.txt
 
-  pbs_bose_polfed_grouped/data/U_4p0/W_6p0/L_10/N_10_nmax_2/
-      energies_polfed_U4_L10_N10_nmax2_W6_nreal400.txt
+  pbs_bose_polfed_grouped/data/U_4p0/W_6p0/L_10/N_10_nmax_2/boundary_periodic/
+      energies_polfed_U4_L10_N10_nmax2_W6_boundaryperiodic_nreal400.txt
 
 Each energy file is interpreted as a matrix whose columns are disorder
 realizations and whose rows are sorted eigenvalues near the requested target.
@@ -41,6 +41,7 @@ class GapRatioResult:
     Ndown: int | None
     N: int | None
     nmax: int | None
+    boundary: str | None
     mean_r: float
     stderr_r: float
     n_r_values: int
@@ -56,8 +57,18 @@ def parse_float_tag(tag: str) -> float:
     return float(tag.replace("m", "-").replace("p", "."))
 
 
-def parse_metadata(path: Path) -> tuple[float, float, int | None, int | None, int | None, int | None, int | None]:
+def parse_boundary(path: Path) -> str | None:
     text = path.as_posix()
+    file_match = re.search(r"_boundary(?P<boundary>open|periodic)_", path.name)
+    if file_match:
+        return file_match.group("boundary")
+    path_match = re.search(r"/boundary_(?P<boundary>open|periodic)/", text)
+    return path_match.group("boundary") if path_match else None
+
+
+def parse_metadata(path: Path) -> tuple[float, float, int | None, int | None, int | None, int | None, int | None, str | None]:
+    text = path.as_posix()
+    boundary = parse_boundary(path)
 
     fermion_file_match = re.search(
         r"energies_[^_]+_U(?P<U>[-+0-9.eE]+)_L(?P<L>\d+)_Nup(?P<Nup>\d+)_Ndown(?P<Ndown>\d+)_W(?P<W>[-+0-9.eE]+)_",
@@ -72,6 +83,7 @@ def parse_metadata(path: Path) -> tuple[float, float, int | None, int | None, in
             int(fermion_file_match.group("Ndown")),
             None,
             None,
+            boundary,
         )
 
     boson_file_match = re.search(
@@ -87,6 +99,7 @@ def parse_metadata(path: Path) -> tuple[float, float, int | None, int | None, in
             None,
             int(boson_file_match.group("N")),
             int(boson_file_match.group("nmax")),
+            boundary,
         )
 
     u_match = re.search(r"/U_([^/]+)/", text)
@@ -105,7 +118,7 @@ def parse_metadata(path: Path) -> tuple[float, float, int | None, int | None, in
     Ndown = int(fermion_sector_match.group(2)) if fermion_sector_match else None
     N = int(boson_sector_match.group(1)) if boson_sector_match else None
     nmax = int(boson_sector_match.group(2)) if boson_sector_match else None
-    return U, W, L, Nup, Ndown, N, nmax
+    return U, W, L, Nup, Ndown, N, nmax, boundary
 
 
 def load_energy_matrix(path: Path) -> np.ndarray:
@@ -188,7 +201,7 @@ def zero_gap_fraction(energies: np.ndarray, gap_atol: float) -> float:
 
 def analyze_file(path: Path, middle_count: int | None, edge_fraction: float,
                  min_levels: int, gap_atol: float, deduplicate_tol: float) -> GapRatioResult | None:
-    U, W, L, Nup, Ndown, N, nmax = parse_metadata(path)
+    U, W, L, Nup, Ndown, N, nmax, boundary = parse_metadata(path)
     E = load_energy_matrix(path)
     if E.size == 0:
         return None
@@ -231,6 +244,7 @@ def analyze_file(path: Path, middle_count: int | None, edge_fraction: float,
         Ndown=Ndown,
         N=N,
         nmax=nmax,
+        boundary=boundary,
         mean_r=mean_r,
         stderr_r=stderr_r,
         n_r_values=n_r_values,
@@ -272,6 +286,7 @@ def write_csv(results: list[GapRatioResult], output_csv: Path) -> None:
             "Ndown",
             "N",
             "nmax",
+            "boundary",
             "file",
         ])
         for r in sorted(results, key=lambda x: (x.W, x.U, str(x.path))):
@@ -292,12 +307,14 @@ def write_csv(results: list[GapRatioResult], output_csv: Path) -> None:
                 r.Ndown if r.Ndown is not None else "",
                 r.N if r.N is not None else "",
                 r.nmax if r.nmax is not None else "",
+                r.boundary if r.boundary is not None else "",
                 r.path.as_posix(),
             ])
 
 
 def apply_filters(results: list[GapRatioResult], L: int | None, Nup: int | None,
-                  Ndown: int | None, N: int | None, nmax: int | None) -> list[GapRatioResult]:
+                  Ndown: int | None, N: int | None, nmax: int | None,
+                  boundary: str | None) -> list[GapRatioResult]:
     filtered = results
     if L is not None:
         filtered = [r for r in filtered if r.L == L]
@@ -309,13 +326,15 @@ def apply_filters(results: list[GapRatioResult], L: int | None, Nup: int | None,
         filtered = [r for r in filtered if r.N == N]
     if nmax is not None:
         filtered = [r for r in filtered if r.nmax == nmax]
+    if boundary is not None:
+        filtered = [r for r in filtered if r.boundary == boundary]
     return filtered
 
 
 def keep_best_duplicate(results: list[GapRatioResult]) -> list[GapRatioResult]:
-    best: dict[tuple[float, float, int | None, int | None, int | None, int | None, int | None], GapRatioResult] = {}
+    best: dict[tuple[float, float, int | None, int | None, int | None, int | None, int | None, str | None], GapRatioResult] = {}
     for r in results:
-        key = (r.U, r.W, r.L, r.Nup, r.Ndown, r.N, r.nmax)
+        key = (r.U, r.W, r.L, r.Nup, r.Ndown, r.N, r.nmax, r.boundary)
         old = best.get(key)
         if old is None:
             best[key] = r
@@ -498,7 +517,7 @@ def main() -> None:
     parser.add_argument("--output-dir", default="gap_ratio_results", type=Path)
     parser.add_argument("--middle-count", type=int, default=None,
                         help="Use exactly this many central levels from each realization.")
-    parser.add_argument("--edge-fraction", type=float, default=0.25,
+    parser.add_argument("--edge-fraction", type=float, default=0.20,
                         help="If --middle-count is not set, drop this fraction from each edge.")
     parser.add_argument("--min-levels", type=int, default=20,
                         help="Skip a realization if fewer central levels remain.")
@@ -511,6 +530,8 @@ def main() -> None:
     parser.add_argument("--Ndown", type=int, default=None, help="Analyze only this Ndown sector.")
     parser.add_argument("--N", type=int, default=None, help="Analyze only this bosonic total-N sector.")
     parser.add_argument("--nmax", type=int, default=None, help="Analyze only this bosonic nmax sector.")
+    parser.add_argument("--boundary", choices=["open", "periodic"], default=None,
+                        help="Analyze only this boundary-condition sector.")
     parser.add_argument("--keep-duplicates", action="store_true",
                         help="Keep duplicate U,W files instead of choosing the one with most data.")
     parser.add_argument("--plot", choices=["curves", "heatmap", "both"], default="curves",
@@ -545,9 +566,9 @@ def main() -> None:
     if not results:
         raise SystemExit("No usable energy files found.")
 
-    results = apply_filters(results, args.L, args.Nup, args.Ndown, args.N, args.nmax)
+    results = apply_filters(results, args.L, args.Nup, args.Ndown, args.N, args.nmax, args.boundary)
     if not results:
-        raise SystemExit("No files matched the requested L/Nup/Ndown/N/nmax filters.")
+        raise SystemExit("No files matched the requested L/Nup/Ndown/N/nmax/boundary filters.")
     if not args.keep_duplicates:
         before = len(results)
         results = keep_best_duplicate(results)

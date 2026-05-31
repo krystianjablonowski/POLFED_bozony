@@ -38,7 +38,7 @@ my $seed0         = 1234;
 my $howmany       = 500;
 my $target        = "middle";
 my $block         = 4;
-my $boundary      = "open";
+my $boundary      = "periodic";
 
 my $outdir        = "pbs_bose_polfed_grouped";
 my $workdir       = "";
@@ -183,10 +183,10 @@ foreach my $U (@Us) {
 
         my $Utag = safe_float_string($U);
         my $Wtag = safe_float_string($W);
-        my $sector = "L_${L}/N_${N_eff}_nmax_${nmax}";
+        my $sector = "L_${L}/N_${N_eff}_nmax_${nmax}/boundary_${boundary}";
         my $data_dir = "$workdir/$outdir/data/U_${Utag}/W_${Wtag}/$sector";
 
-        my $jobtag = sprintf("U%s_W%s_L%d_N%d_nm%d", $Utag, $Wtag, $L, $N_eff, $nmax);
+        my $jobtag = sprintf("U%s_W%s_L%d_N%d_nm%d_b%s", $Utag, $Wtag, $L, $N_eff, $nmax, $boundary);
         my $jobname = sprintf("%s_%s", $job_prefix, $jobtag);
         $jobname = substr($jobname, 0, 30);
 
