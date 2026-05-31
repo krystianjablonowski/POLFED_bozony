@@ -231,7 +231,7 @@ function polfed_energies(rng::AbstractRNG, H::SparseMatrixCSC{Float64,Int},
     end
 
     result = try
-        polfed(H, x0, howmany, target)
+        Base.invokelatest(Polfed.polfed, H, x0, howmany, target)
     catch err
         msg = sprint(showerror, err)
         error("POLFED call failed for polfed(H, x0, howmany, target). " *
