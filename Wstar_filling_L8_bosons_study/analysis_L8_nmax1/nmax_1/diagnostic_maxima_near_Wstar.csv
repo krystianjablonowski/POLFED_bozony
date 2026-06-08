@@ -1,0 +1,9 @@
+L,N,nmax,filling,observable,U_at_maximum,sampled_W_near_Wstar,maximum_value
+8,7,1,0.875,onsite_pair_variance,1.0,9.0,0.0
+8,7,1,0.875,charge_fluctuation,1.0,9.0,0.04309857435344175
+8,7,1,0.875,fock_entropy_normalized,1.0,9.0,0.3208591224986587
+8,7,1,0.875,pr_normalized,1.0,9.0,0.21282871318179297
+8,7,1,0.875,Nres_mean_l1.0,1.0,9.0,0.22075
+8,7,1,0.875,Nres_mean_l2.0,1.0,9.0,0.41125
+8,7,1,0.875,fres_l1.0,1.0,9.0,0.110375
+8,7,1,0.875,fres_l2.0,1.0,9.0,0.205625
