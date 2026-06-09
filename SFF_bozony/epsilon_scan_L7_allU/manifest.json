@@ -1,0 +1,27 @@
+{
+  "source_results": "results_multi_nmax_L7_allU",
+  "epsilon_values": [
+    0.03,
+    0.05,
+    0.08
+  ],
+  "stable_points": 4,
+  "dip_tau_max": 1.0,
+  "cases": [
+    {
+      "epsilon": 0.03,
+      "directory": "epsilon_scan_L7_allU/epsilon_0p03",
+      "summary": "epsilon_scan_L7_allU/epsilon_0p03/thouless_summary.csv"
+    },
+    {
+      "epsilon": 0.05,
+      "directory": "epsilon_scan_L7_allU/epsilon_0p05",
+      "summary": "epsilon_scan_L7_allU/epsilon_0p05/thouless_summary.csv"
+    },
+    {
+      "epsilon": 0.08,
+      "directory": "epsilon_scan_L7_allU/epsilon_0p08",
+      "summary": "epsilon_scan_L7_allU/epsilon_0p08/thouless_summary.csv"
+    }
+  ]
+}

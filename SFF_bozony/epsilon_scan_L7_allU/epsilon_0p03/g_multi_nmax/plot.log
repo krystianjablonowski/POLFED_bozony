@@ -1,0 +1,16 @@
+Summary files: 1
+  /home/2/kj405942/POLFED_bosons/SFF_bozony/epsilon_scan_L7_allU/epsilon_0p03/thouless_summary.csv
+Selected points: 469
+Available nmax values: [2, 3, 4]
+Saved selected-point table: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/g_multi_nmax_selected_points.csv
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U1_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U2_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U3_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U4_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U5_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U6_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U7_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U8_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U9_L7_N7_boundaryperiodic
+Saved nmax-comparison plot: epsilon_scan_L7_allU/epsilon_0p03/g_multi_nmax/plots/g_vs_W_multi_nmax_U10_L7_N7_boundaryperiodic
+Saved nmax-comparison figures: 10
