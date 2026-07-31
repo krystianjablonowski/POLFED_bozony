@@ -285,14 +285,15 @@ def make_plot(
             fontweight="bold",
         )
         ax.text(
-            0.08,
-            0.84,
+            0.90,
+            0.78,
             label,
             transform=ax.transAxes,
-            ha="left",
+            ha="right",
             va="top",
             fontsize=15,
             linespacing=0.95,
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.72, pad=1.2),
         )
         ax.tick_params(which="both", direction="in", top=True, right=True)
         ax.minorticks_on()
