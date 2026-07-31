@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -71,6 +72,46 @@ def read_summary(path: Path) -> list[Row]:
     return rows
 
 
+def read_observable_dir(path: Path) -> list[Row]:
+    grouped: dict[tuple[int, int, int, float, float], list[float]] = defaultdict(list)
+    for csv_path in sorted(path.rglob("observables_*.csv")):
+        with csv_path.open(newline="") as f:
+            reader = csv.DictReader(f)
+            for rec in reader:
+                try:
+                    L = int(float(rec["L"]))
+                    N = int(float(rec["N"]))
+                    nmax = int(float(rec["nmax"]))
+                    U = float(rec["U"])
+                    W = float(rec["W"])
+                    r_mean = float(rec["r_mean"])
+                except (KeyError, ValueError):
+                    continue
+                if np.isfinite(r_mean):
+                    grouped[(L, N, nmax, U, W)].append(r_mean)
+
+    rows: list[Row] = []
+    for (L, N, nmax, U, W), values in sorted(grouped.items()):
+        arr = np.asarray(values, dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if len(arr) == 0:
+            continue
+        stderr = float(np.std(arr, ddof=1) / math.sqrt(len(arr))) if len(arr) > 1 else float("nan")
+        rows.append(
+            Row(
+                U=U,
+                W=W,
+                mean_r=float(np.mean(arr)),
+                stderr_r=stderr,
+                L=L,
+                N=N,
+                nmax=nmax,
+                boundary=None,
+            )
+        )
+    return rows
+
+
 def parse_float_list(text: str | None) -> list[float] | None:
     if text is None or text.strip() == "":
         return None
@@ -120,14 +161,13 @@ def panel_title(rows: list[Row], fallback: str) -> str:
     L_values = sorted({row.L for row in rows if row.L is not None})
     N_values = sorted({row.N for row in rows if row.N is not None})
     nmax_values = sorted({row.nmax for row in rows if row.nmax is not None})
-    parts = []
-    if len(L_values) == 1:
-        parts.append(rf"L={L_values[0]}")
-    if len(N_values) == 1:
-        parts.append(rf"N={N_values[0]}")
+    if len(L_values) == 1 and len(N_values) == 1 and len(nmax_values) == 1:
+        return rf"$L={L_values[0]},\ N={N_values[0]}$" + "\n" + rf"$n_{{\max}}={nmax_values[0]}$"
+    if len(L_values) == 1 and len(N_values) == 1:
+        return rf"$L={L_values[0]},\ N={N_values[0]}$"
     if len(nmax_values) == 1:
-        parts.append(rf"n_{{\max}}={nmax_values[0]}")
-    return r"$" + r",\ ".join(parts) + r"$" if parts else fallback
+        return rf"$n_{{\max}}={nmax_values[0]}$"
+    return fallback
 
 
 def style_matplotlib() -> None:
@@ -138,23 +178,23 @@ def style_matplotlib() -> None:
             "font.family": "serif",
             "font.serif": ["STIXGeneral", "Times New Roman", "DejaVu Serif"],
             "mathtext.fontset": "stix",
-            "font.size": 10,
-            "axes.labelsize": 13,
-            "axes.titlesize": 12,
-            "legend.fontsize": 9,
-            "xtick.labelsize": 11,
-            "ytick.labelsize": 11,
-            "axes.linewidth": 1.05,
+            "font.size": 14,
+            "axes.labelsize": 18,
+            "axes.titlesize": 16,
+            "legend.fontsize": 14,
+            "xtick.labelsize": 16,
+            "ytick.labelsize": 16,
+            "axes.linewidth": 1.35,
             "xtick.direction": "in",
             "ytick.direction": "in",
             "xtick.top": True,
             "ytick.right": True,
             "xtick.minor.visible": True,
             "ytick.minor.visible": True,
-            "xtick.major.width": 1.05,
-            "ytick.major.width": 1.05,
-            "xtick.minor.width": 0.8,
-            "ytick.minor.width": 0.8,
+            "xtick.major.width": 1.35,
+            "ytick.major.width": 1.35,
+            "xtick.minor.width": 1.0,
+            "ytick.minor.width": 1.0,
             "savefig.bbox": "tight",
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
@@ -194,8 +234,8 @@ def make_plot(
 
     ncols = max(1, ncols)
     nrows = int(math.ceil(len(usable_panels) / ncols))
-    fig_width = 3.65 * ncols + 0.55
-    fig_height = 2.85 * nrows
+    fig_width = 4.45 * ncols + 1.05
+    fig_height = 3.55 * nrows
     fig, axes = plt.subplots(
         nrows,
         ncols,
@@ -204,6 +244,7 @@ def make_plot(
         sharey=True,
         squeeze=False,
     )
+    fig.subplots_adjust(left=0.09, right=0.84, bottom=0.10, top=0.96, wspace=0.10, hspace=0.16)
 
     cmap = plt.get_cmap(cmap_name)
     norm = mpl.colors.Normalize(vmin=min(selected_u), vmax=max(selected_u))
@@ -225,13 +266,13 @@ def make_plot(
                 R[order],
                 color=cmap(norm(U)),
                 marker=markers[u_index % len(markers)],
-                ms=3.0,
-                lw=1.15,
+                ms=4.0,
+                lw=1.55,
                 alpha=0.96,
             )
 
-        ax.axhline(GOE_R, color="0.35", lw=1.05, ls="--")
-        ax.axhline(POISSON_R, color="0.35", lw=1.15, ls=":")
+        ax.axhline(GOE_R, color="0.35", lw=1.35, ls="--")
+        ax.axhline(POISSON_R, color="0.35", lw=1.45, ls=":")
         letter = panel_letters[panel_index] if panel_index < len(panel_letters) else str(panel_index + 1)
         ax.text(
             0.96,
@@ -240,17 +281,18 @@ def make_plot(
             transform=ax.transAxes,
             ha="right",
             va="top",
-            fontsize=17,
+            fontsize=23,
             fontweight="bold",
         )
         ax.text(
-            0.53,
-            0.83,
+            0.08,
+            0.84,
             label,
             transform=ax.transAxes,
             ha="left",
             va="top",
-            fontsize=12.5,
+            fontsize=15,
+            linespacing=0.95,
         )
         ax.tick_params(which="both", direction="in", top=True, right=True)
         ax.minorticks_on()
@@ -275,8 +317,8 @@ def make_plot(
             ax.set_ylim(y_min, y_max)
 
     first_ax = axes[0][0]
-    goe = mpl.lines.Line2D([0], [0], color="0.35", lw=1.05, ls="--", label="GOE")
-    poisson = mpl.lines.Line2D([0], [0], color="0.35", lw=1.15, ls=":", label="Poisson")
+    goe = mpl.lines.Line2D([0], [0], color="0.35", lw=1.35, ls="--", label="GOE")
+    poisson = mpl.lines.Line2D([0], [0], color="0.35", lw=1.45, ls=":", label="Poisson")
     first_ax.legend(
         handles=[goe, poisson],
         loc="lower left",
@@ -291,8 +333,8 @@ def make_plot(
 
     sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
-    data_axes = [ax for ax in axes.flat if ax.has_data()]
-    cbar = fig.colorbar(sm, ax=data_axes, pad=0.02, fraction=0.035)
+    cbar_ax = fig.add_axes([0.875, 0.17, 0.028, 0.66])
+    cbar = fig.colorbar(sm, cax=cbar_ax)
     cbar.set_label(r"$U$")
     preferred_ticks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 20, 25, 30, 40, 50]
     ticks = [tick for tick in preferred_ticks if min(selected_u) <= tick <= max(selected_u)]
@@ -301,7 +343,6 @@ def make_plot(
     cbar.set_ticks(ticks)
     cbar.set_ticklabels([f"{tick:g}" for tick in ticks])
 
-    fig.subplots_adjust(left=0.08, right=0.89, bottom=0.09, top=0.98, wspace=0.08, hspace=0.13)
     output_base.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_base.with_suffix(".png"), dpi=600)
     fig.savefig(output_base.with_suffix(".pdf"))
@@ -315,8 +356,15 @@ def main() -> None:
         "--summary",
         type=Path,
         action="append",
-        required=True,
+        default=[],
         help="Path to a gap_ratio_summary.csv file. Repeat once per panel.",
+    )
+    parser.add_argument(
+        "--observable-dir",
+        type=Path,
+        action="append",
+        default=[],
+        help="Directory with observables_*.csv files. Repeat once per panel.",
     )
     parser.add_argument("--output", type=Path, default=Path("gap_ratio_bose_unit_filling_panels/r_vs_W_unit_filling"))
     parser.add_argument("--U-list", default="all", help="Comma-separated U values, or 'all'.")
@@ -333,6 +381,9 @@ def main() -> None:
     parser.add_argument("--ncols", type=int, default=2)
     args = parser.parse_args()
 
+    if not args.summary and not args.observable_dir:
+        raise SystemExit("Provide at least one --summary or --observable-dir.")
+
     requested_u = parse_float_list(args.U_list)
     panels: list[tuple[str, list[Row]]] = []
     for path in args.summary:
@@ -348,6 +399,19 @@ def main() -> None:
             boundary=args.boundary,
         )
         panels.append((panel_title(rows, path.parent.name), rows))
+    for path in args.observable_dir:
+        rows = read_observable_dir(path)
+        rows = apply_filters(
+            rows,
+            unit_filling=args.unit_filling,
+            nmax=args.nmax,
+            min_u=args.min_U,
+            max_u=args.max_U,
+            min_w=args.min_W,
+            max_w=args.max_W,
+            boundary=None,
+        )
+        panels.append((panel_title(rows, path.name), rows))
 
     make_plot(
         panels=panels,
