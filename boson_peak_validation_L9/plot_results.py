@@ -99,6 +99,8 @@ def restrict_W(frame: pd.DataFrame, minimum: float, maximum: float) -> pd.DataFr
 
 
 def main_sectors(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame["L"].nunique() == 1:
+        return frame
     unit = frame[frame["L"] == frame["N"]]
     if unit.empty:
         return frame
