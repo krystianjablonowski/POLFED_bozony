@@ -1,0 +1,78 @@
+{
+  "model": {
+    "t": 1.0,
+    "boundary": "open",
+    "dense_max": 5000
+  },
+  "theory": {
+    "standard_sector_set": true,
+    "W_log_min": 0.1,
+    "W_log_max": 32.0,
+    "W_log_points": 81,
+    "W_linear_values": [0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 4.0, 8.0, 12.0, 16.0, 24.0, 32.0],
+    "peak_grid_points": 4001,
+    "peak_U_min_max_over_t": 4.0,
+    "peak_U_max_per_W": 2.0,
+    "peak_max_expansions": 3
+  },
+  "ed": {
+    "sectors": [
+      {"L": 9, "N": 9, "nmax": [2, 3, 4, 6]},
+      {"L": 6, "N": 6, "nmax": 4},
+      {"L": 7, "N": 7, "nmax": 4},
+      {"L": 8, "N": 8, "nmax": 4},
+      {"L": 9, "N": 5, "nmax": 4},
+      {"L": 9, "N": 7, "nmax": 4}
+    ],
+    "W_values": [0.5, 1.0, 2.0, 4.0, 8.0, 12.0],
+    "realizations": 100,
+    "realization_block_size": 5,
+    "master_seed": 20260907,
+    "validate_L6_dense_sparse": true,
+    "L6_validation_tolerances": {"energy": 1.0e-8, "entropy": 1.0e-7},
+    "U_grid": {
+      "mode": "adaptive_theory",
+      "points": 9,
+      "absolute_half_width_over_t": 0.10,
+      "relative_half_width": 0.25,
+      "round_decimals": 8
+    }
+  },
+  "eigensolver": {
+    "backend": "scipy",
+    "nev": 36,
+    "n_states": 20,
+    "tol": 1.0e-10,
+    "residual_tol": 1.0e-9,
+    "orthogonality_tol": 1.0e-8,
+    "maxiter": 40000,
+    "ncv": 112,
+    "retries": 4,
+    "ncv_retry_growth": 40,
+    "sigma_shift_fraction": 1.0e-8,
+    "gap_edge_discard": 2,
+    "shift_invert_memory_factor": 18.0
+  },
+  "analysis": {
+    "bootstrap": 5000,
+    "bootstrap_seed": 20260908,
+    "local_fit_points": 5,
+    "max_plateau_points": 3,
+    "min_peak_significance_z": 2.0,
+    "min_bootstrap_valid_fraction": 0.5,
+    "max_ci_width_fraction_scan": 0.6,
+    "max_required_realizations": 500,
+    "entropy_identity_tol": 1.0e-9,
+    "figure_dpi": 400
+  },
+  "cluster": {
+    "python": "python",
+    "array_concurrency": 2,
+    "cpus_per_task": 1,
+    "memory": "128gb",
+    "walltime": "96:00:00"
+  },
+  "paths": {
+    "theory_output_dir": "theory_stage_A_production"
+  }
+}
