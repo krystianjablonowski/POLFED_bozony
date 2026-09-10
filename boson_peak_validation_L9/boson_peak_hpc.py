@@ -175,7 +175,7 @@ def ed_U_grid(config: Dict[str, Any], L: int, N: int, nmax: int, W_over_t: float
 def estimated_memory_mb(structure: core.BosonStructure, config: Dict[str, Any]) -> float:
     dim, nnz = structure.dim, int(structure.hopping.nnz)
     solver = config["eigensolver"]
-    nev = min(int(solver.get("nev", 36)), dim)
+    nev = core.requested_eigenpair_count(dim, solver)
     csr_bytes = nnz * (8 + 4) + (dim + 1) * 4
     vectors_bytes = dim * nev * 8
     backend = solver.get("backend", "auto")
@@ -204,14 +204,15 @@ def dry_run(config: Dict[str, Any], task_table: Optional[Path]) -> None:
         block_lookup = {}
     cached: Dict[Tuple[int, int, int], core.BosonStructure] = {}
     grand_diagonalizations = 0
-    print("L  N  nmax  W/t       D       nnz   R  nU  diagonalizations  estimated_MB")
-    print("-" * 88)
+    print("L  N  nmax  W/t       D  states       nnz   R  nU  diagonalizations  estimated_MB")
+    print("-" * 97)
     metadata_rows = []
     for L, N, nmax, W in combinations:
         key = (L, N, nmax)
         if key not in cached:
             cached[key] = core.build_structure(L, N, nmax, float(config["model"].get("t", 1.0)))
         structure = cached[key]
+        selected_states = core.selected_state_count(structure.dim, config["eigensolver"])
         U_values = ed_U_grid(config, L, N, nmax, W)
         if block_lookup:
             realization_count = sum(t["realization_stop"] - t["realization_start"] for t in block_lookup[(L, N, nmax, W)])
@@ -221,8 +222,8 @@ def dry_run(config: Dict[str, Any], task_table: Optional[Path]) -> None:
         grand_diagonalizations += diagonalizations
         memory = estimated_memory_mb(structure, config)
         print(
-            "{:<2d} {:<2d} {:<5d} {:<6g} {:>7d} {:>9d} {:>3d} {:>3d} {:>17d} {:>13.1f}".format(
-                L, N, nmax, W, structure.dim, structure.hopping.nnz,
+            "{:<2d} {:<2d} {:<5d} {:<6g} {:>7d} {:>7d} {:>9d} {:>3d} {:>3d} {:>17d} {:>13.1f}".format(
+                L, N, nmax, W, structure.dim, selected_states, structure.hopping.nnz,
                 realization_count, U_values.size, diagonalizations, memory,
             )
         )
@@ -230,6 +231,7 @@ def dry_run(config: Dict[str, Any], task_table: Optional[Path]) -> None:
             {
                 "L": L, "N": N, "nmax": nmax, "W_over_t": W,
                 "D": structure.dim, "hopping_nnz": int(structure.hopping.nnz),
+                "selected_states": selected_states,
                 "realizations": realization_count, "U_points": int(U_values.size),
                 "diagonalizations": diagonalizations, "estimated_peak_memory_MB": memory,
             }
@@ -248,7 +250,7 @@ def dry_run(config: Dict[str, Any], task_table: Optional[Path]) -> None:
 
 
 def empty_result_arrays(structure: core.BosonStructure, config: Dict[str, Any]) -> Dict[str, np.ndarray]:
-    nev = min(int(config["eigensolver"].get("nev", 36)), structure.dim)
+    nev = core.requested_eigenpair_count(structure.dim, config["eigensolver"])
     nq = int(np.max(structure.interaction_q, initial=0)) + 1
     return {
         "U_over_t": np.empty(0, dtype=float),
@@ -316,7 +318,9 @@ def solve_one_U(
     t = float(config["model"].get("t", 1.0))
     H = core.hamiltonian(structure, U_over_t * t, epsilon)
     solution = core.solve_central_spectrum(H, config["eigensolver"], int(config["model"].get("dense_max", 5000)))
-    _, selected_vectors = core.select_central_states(solution, int(config["eigensolver"].get("n_states", 20)))
+    solver = config["eigensolver"]
+    selected_count = core.selected_state_count(structure.dim, solver)
+    _, selected_vectors = core.select_central_states(solution, selected_count)
     observables = core.state_observables(selected_vectors, structure.interaction_q, structure.dim)
     tolerance = float(config["analysis"].get("entropy_identity_tol", 1.0e-9))
     if observables["identity_error"] > tolerance:
@@ -398,6 +402,7 @@ def process_realization(
     if (
         missing and int(task["L"]) == 6 and realization == 0
         and bool(config["ed"].get("validate_L6_dense_sparse", True)) and not validation
+        and str(config["eigensolver"].get("backend", "auto")) != "dense"
     ):
         validation = core.validate_dense_sparse(structure, missing[0] * t, epsilon, config["eigensolver"])
         limits = config["ed"].get("L6_validation_tolerances", {})

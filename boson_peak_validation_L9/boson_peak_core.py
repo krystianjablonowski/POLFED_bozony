@@ -30,7 +30,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
 
-PROGRAM_VERSION = "1.0.0"
+PROGRAM_VERSION = "1.1.0"
 SCHEMA_VERSION = 1
 FLOAT_ATOL = 1.0e-12
 
@@ -268,6 +268,9 @@ def validate_config(config: Dict[str, Any]) -> None:
         raise ValueError("eigensolver.nev must be at least 4")
     if int(solver.get("n_states", 20)) < 1:
         raise ValueError("eigensolver.n_states must be positive")
+    fraction = solver.get("spectrum_fraction")
+    if fraction is not None and not (0.0 < float(fraction) <= 1.0):
+        raise ValueError("eigensolver.spectrum_fraction must be in (0, 1]")
     if float(solver.get("residual_tol", 1.0e-9)) <= 0:
         raise ValueError("eigensolver.residual_tol must be positive")
     if int(config["analysis"].get("bootstrap", 2000)) < 1:
@@ -567,9 +570,20 @@ def _sparse_extreme(H: sp.csr_matrix, which: str, settings: Dict[str, Any]) -> f
     )
 
 
+def selected_state_count(dim: int, settings: Dict[str, Any]) -> int:
+    fraction = settings.get("spectrum_fraction")
+    if fraction is not None:
+        return min(dim, max(1, int(math.ceil(float(fraction) * dim))))
+    return min(dim, int(settings.get("n_states", 20)))
+
+
+def requested_eigenpair_count(dim: int, settings: Dict[str, Any]) -> int:
+    return min(dim, max(int(settings.get("nev", 36)), selected_state_count(dim, settings)))
+
+
 def solve_central_spectrum(H: sp.csr_matrix, settings: Dict[str, Any], dense_max: int) -> Dict[str, Any]:
     dim = int(H.shape[0])
-    requested = min(int(settings.get("nev", 36)), dim)
+    requested = requested_eigenpair_count(dim, settings)
     backend = str(settings.get("backend", "auto"))
     use_dense = backend == "dense" or (backend == "auto" and dim <= dense_max)
     if backend == "dense" and dim > dense_max:
@@ -744,8 +758,9 @@ def validate_dense_sparse(structure: BosonStructure, U: float, epsilon: np.ndarr
     dense = solve_central_spectrum(H, dense_settings, max(structure.dim, 2))
     sparse = solve_central_spectrum(H, sparse_settings, max(structure.dim, 2))
     energy_error = float(np.max(np.abs(np.asarray(dense["energies"]) - np.asarray(sparse["energies"]))))
-    _, dense_vectors = select_central_states(dense, int(settings.get("n_states", 20)))
-    _, sparse_vectors = select_central_states(sparse, int(settings.get("n_states", 20)))
+    count = selected_state_count(H.shape[0], settings)
+    _, dense_vectors = select_central_states(dense, count)
+    _, sparse_vectors = select_central_states(sparse, count)
     dense_obs = state_observables(dense_vectors, structure.interaction_q, structure.dim)
     sparse_obs = state_observables(sparse_vectors, structure.interaction_q, structure.dim)
     entropy_error = abs(float(np.mean(dense_obs["entropy_norm"])) - float(np.mean(sparse_obs["entropy_norm"])))

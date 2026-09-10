@@ -1,0 +1,24 @@
+L,N,nmax,W_over_t,recommended_action,reason,proposed_U_min_over_t,proposed_U_max_over_t,proposed_U_values_over_t_json,suggested_realizations
+6,6,3,0.5,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.15,"[0.0, 0.01875, 0.0375, 0.05625, 0.075, 0.09375, 0.1125, 0.13125, 0.15]",500
+6,6,3,0.6,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.125,"[0.0, 0.015625, 0.03125, 0.046875, 0.0625, 0.078125, 0.09375, 0.109375, 0.125]",500
+6,6,3,0.7,refine_near_U0,plateau_includes_U0;low_peak_significance,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,0.8,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",500
+6,6,3,0.9,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.0,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.1,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",500
+6,6,3,1.2,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",500
+6,6,3,1.3,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.4,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.5,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.6,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.7,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,1.8,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",500
+6,6,3,1.9,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",500
+6,6,3,2.0,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;wide_plateau;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",200
+6,6,3,2.1,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;wide_plateau;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.125,"[0.0, 0.015625, 0.03125, 0.046875, 0.0625, 0.078125, 0.09375, 0.109375, 0.125]",200
+6,6,3,2.2,refine_near_U0,local_fit_rejected;peak_estimators_disagree;scan_boundary;plateau_includes_U0;wide_plateau;low_peak_significance,0.0,0.125,"[0.0, 0.015625, 0.03125, 0.046875, 0.0625, 0.078125, 0.09375, 0.109375, 0.125]",200
+6,6,3,2.3,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.15,"[0.0, 0.01875, 0.0375, 0.05625, 0.075, 0.09375, 0.1125, 0.13125, 0.15]",500
+6,6,3,2.4,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.125,"[0.0, 0.015625, 0.03125, 0.046875, 0.0625, 0.078125, 0.09375, 0.109375, 0.125]",500
+6,6,3,2.5,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.1,"[0.0, 0.0125, 0.025, 0.0375, 0.05, 0.0625, 0.075, 0.0875, 0.1]",500
+6,6,4,1.9,refine_plateau,wide_plateau,0.175,0.275,"[0.175, 0.1875, 0.2, 0.2125, 0.225, 0.2375, 0.25, 0.2625, 0.275]",200
+6,6,4,2.0,refine_plateau,wide_plateau,0.175,0.275,"[0.175, 0.1875, 0.2, 0.2125, 0.225, 0.2375, 0.25, 0.2625, 0.275]",200

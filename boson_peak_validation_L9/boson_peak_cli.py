@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List
 
 import boson_peak_core as core
@@ -31,6 +32,22 @@ def _sector(text: str) -> Dict[str, int]:
     return {"L": L, "N": N, "nmax": nmax}
 
 
+def _range_values(text: str, name: str) -> List[float]:
+    parts = text.split(":")
+    if len(parts) != 3:
+        raise ValueError("{} must have the form START:STOP:STEP".format(name))
+    try:
+        start, stop, step = (Decimal(part.strip()) for part in parts)
+    except InvalidOperation as exc:
+        raise ValueError("{} contains a non-numeric value".format(name)) from exc
+    if start < 0 or stop < start or step <= 0:
+        raise ValueError("{} requires 0 <= START <= STOP and STEP > 0".format(name))
+    intervals = (stop - start) / step
+    if intervals != intervals.to_integral_value():
+        raise ValueError("{} STEP must land exactly on STOP".format(name))
+    return [float(start + index * step) for index in range(int(intervals) + 1)]
+
+
 def add_scan_arguments(parser: argparse.ArgumentParser, include_cluster: bool = True) -> None:
     sector = parser.add_argument_group("direct scan parameters")
     sector.add_argument("--sector", action="append", default=[], metavar="L:N:NMAX",
@@ -43,8 +60,12 @@ def add_scan_arguments(parser: argparse.ArgumentParser, include_cluster: bool = 
                         help="one nmax or a comma-separated list")
     sector.add_argument("--W-list", "--w-list", dest="W_list", metavar="LIST",
                         help="comma-separated W/t values")
+    sector.add_argument("--W-range", "--w-range", dest="W_range", metavar="START:STOP:STEP",
+                        help="inclusive uniform W/t range")
     sector.add_argument("--U-list", "--u-list", dest="U_list", metavar="LIST",
                         help="explicit comma-separated nonnegative U/t values")
+    sector.add_argument("--U-range", "--u-range", dest="U_range", metavar="START:STOP:STEP",
+                        help="inclusive uniform nonnegative U/t range")
     sector.add_argument("--adaptive-U", "--adaptive-u", action="store_true", dest="adaptive_U",
                         help="use the theory-centered adaptive U grid")
     sector.add_argument("--U-points", "--u-points", type=int, dest="U_points",
@@ -58,6 +79,10 @@ def add_scan_arguments(parser: argparse.ArgumentParser, include_cluster: bool = 
     sector.add_argument("--seed", type=int, help="master disorder seed")
     sector.add_argument("--nev", type=int, help="eigenvalues requested from the solver")
     sector.add_argument("--n-states", type=int, help="central eigenstates used for observables")
+    sector.add_argument(
+        "--spectrum-fraction", type=float,
+        help="central fraction of the full spectrum used for observables, for example 0.8",
+    )
     sector.add_argument("--backend", choices=("auto", "scipy", "dense"), help="eigensolver backend")
     sector.add_argument("--theory-scope", choices=("standard", "scan"),
                         help="full standard theory table or only sectors selected for ED")
@@ -89,15 +114,25 @@ def apply_scan_arguments(config: Dict[str, Any], args: argparse.Namespace) -> Di
         ]
 
     W_list = getattr(args, "W_list", None)
+    W_range = getattr(args, "W_range", None)
+    if W_list is not None and W_range is not None:
+        raise ValueError("--W-list and --W-range are mutually exclusive")
     if W_list is not None:
         result["ed"]["W_values"] = sorted(set(_csv_values(W_list, float, "--W-list")))
+    elif W_range is not None:
+        result["ed"]["W_values"] = _range_values(W_range, "--W-range")
     U_list = getattr(args, "U_list", None)
-    if U_list is not None and bool(getattr(args, "adaptive_U", False)):
-        raise ValueError("--U-list and --adaptive-U are mutually exclusive")
+    U_range = getattr(args, "U_range", None)
+    adaptive_U = bool(getattr(args, "adaptive_U", False))
+    if sum(value is not None for value in (U_list, U_range)) + int(adaptive_U) > 1:
+        raise ValueError("--U-list, --U-range, and --adaptive-U are mutually exclusive")
     if U_list is not None:
         result["ed"]["U_grid"]["mode"] = "explicit"
         result["ed"]["U_grid"]["values"] = sorted(set(_csv_values(U_list, float, "--U-list")))
-    elif bool(getattr(args, "adaptive_U", False)):
+    elif U_range is not None:
+        result["ed"]["U_grid"]["mode"] = "explicit"
+        result["ed"]["U_grid"]["values"] = _range_values(U_range, "--U-range")
+    elif adaptive_U:
         result["ed"]["U_grid"]["mode"] = "adaptive_theory"
         result["ed"]["U_grid"].pop("values", None)
 
@@ -107,6 +142,7 @@ def apply_scan_arguments(config: Dict[str, Any], args: argparse.Namespace) -> Di
         ("seed", "ed", "master_seed"),
         ("nev", "eigensolver", "nev"),
         ("n_states", "eigensolver", "n_states"),
+        ("spectrum_fraction", "eigensolver", "spectrum_fraction"),
         ("backend", "eigensolver", "backend"),
         ("U_points", "ed.U_grid", "points"),
         ("U_relative_half_width", "ed.U_grid", "relative_half_width"),
