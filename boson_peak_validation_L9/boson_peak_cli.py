@@ -83,6 +83,10 @@ def add_scan_arguments(parser: argparse.ArgumentParser, include_cluster: bool = 
         "--spectrum-fraction", type=float,
         help="central fraction of the full spectrum used for observables, for example 0.8",
     )
+    sector.add_argument(
+        "--compact-output", action="store_true",
+        help="do not store per-eigenpair energies and residuals in realization files",
+    )
     sector.add_argument("--backend", choices=("auto", "scipy", "dense"), help="eigensolver backend")
     sector.add_argument("--theory-scope", choices=("standard", "scan"),
                         help="full standard theory table or only sectors selected for ED")
@@ -160,6 +164,9 @@ def apply_scan_arguments(config: Dict[str, Any], args: argparse.Namespace) -> Di
         for part in section.split("."):
             target = target[part]
         target[key] = value
+
+    if bool(getattr(args, "compact_output", False)):
+        result["ed"]["store_spectra"] = False
 
     theory_scope = getattr(args, "theory_scope", None)
     if theory_scope == "scan":

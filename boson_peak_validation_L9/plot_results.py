@@ -91,6 +91,13 @@ def optional_bool_column(frame: pd.DataFrame, name: str) -> np.ndarray:
     return bool_column(frame, name)
 
 
+def restrict_W(frame: pd.DataFrame, minimum: float, maximum: float) -> pd.DataFrame:
+    if "W_over_t" not in frame.columns:
+        return frame
+    values = frame["W_over_t"].to_numpy(dtype=float)
+    return frame[(values >= minimum - 1.0e-12) & (values <= maximum + 1.0e-12)].copy()
+
+
 def main_sectors(frame: pd.DataFrame) -> pd.DataFrame:
     unit = frame[frame["L"] == frame["N"]]
     if unit.empty:
@@ -109,51 +116,83 @@ def colors_for(values: Sequence[float], cmap_name: str = "plasma"):
 def common_colorbar(fig: mpl.figure.Figure, axes: Sequence[mpl.axes.Axes], norm, cmap, label: str) -> None:
     scalar = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
     scalar.set_array([])
-    colorbar = fig.colorbar(scalar, ax=list(axes), fraction=0.035, pad=0.035)
+    visible_axes = [ax for ax in axes if ax.get_visible()]
+    bounds = [ax.get_position() for ax in visible_axes]
+    bottom = min(box.y0 for box in bounds)
+    top = max(box.y1 for box in bounds)
+    right = max(box.x1 for box in bounds)
+    colorbar_axis = fig.add_axes([right + 0.025, bottom, 0.020, top - bottom])
+    colorbar = fig.colorbar(scalar, cax=colorbar_axis)
     colorbar.set_label(label)
 
 
-def plot_entropy_curves(curves: pd.DataFrame, peaks: pd.DataFrame, output: Path, dpi: int) -> None:
+def plot_entropy_curves(
+    curves: pd.DataFrame,
+    peaks: pd.DataFrame,
+    output: Path,
+    dpi: int,
+    value_column: str,
+    error_column: str,
+    y_label: str,
+    stem: str,
+    zero_line: bool = False,
+) -> None:
     selected = main_sectors(curves)
     sectors = list(selected.groupby(["L", "N", "nmax"], sort=True))
     if not sectors:
         return
-    fig, axes = grid_axes(len(sectors), sharex=False, sharey=True)
+    fig, axes = grid_axes(len(sectors), sharex=False, sharey=False)
     W_values, norm, cmap = colors_for(selected["W_over_t"].unique())
     for index, ((L, N, nmax), group) in enumerate(sectors):
         ax = axes[index]
-        for marker_index, (W, curve) in enumerate(group.groupby("W_over_t", sort=True)):
+        for _, (W, curve) in enumerate(group.groupby("W_over_t", sort=True)):
             curve = curve.sort_values("U_over_t")
             x = curve["U_over_t"].to_numpy(dtype=float)
-            y = curve["delta_entropy_norm_mean"].to_numpy(dtype=float)
-            error = curve["delta_entropy_norm_paired_sem"].to_numpy(dtype=float)
+            y = curve[value_column].to_numpy(dtype=float)
+            error = curve[error_column].to_numpy(dtype=float)
             color = cmap(norm(float(W)))
-            ax.plot(x, y, color=color, marker=MARKERS[marker_index % len(MARKERS)], markevery=max(1, len(x) // 9))
+            ax.plot(x, y, color=color, marker="o", markersize=2.7,
+                    markevery=max(1, len(x) // 9))
             ax.fill_between(x, y - error, y + error, color=color, alpha=0.12, linewidth=0)
             row = peaks[(peaks["L"] == L) & (peaks["N"] == N) & (peaks["nmax"] == nmax) & np.isclose(peaks["W_over_t"], W)]
             if not row.empty:
                 item = row.iloc[0]
                 theory_x = float(item["U_M_star_over_t"])
                 theory_y = float(np.interp(theory_x, x, y))
-                ax.plot(theory_x, theory_y, marker="*", color=color, markeredgecolor="black", markeredgewidth=0.35, markersize=6.5, linestyle="none")
+                ax.plot(theory_x, theory_y, marker="*", color=color, markeredgecolor="black",
+                        markeredgewidth=0.65, markersize=9.0, linestyle="none", zorder=7)
                 resolved = bool_column(row, "peak_resolved")[0]
                 ed_x = float(item["U_S_star_over_t"] if resolved else item["U_S_candidate_over_t"])
                 ed_y = float(np.interp(ed_x, x, y))
-                ax.plot(ed_x, ed_y, marker="D", mfc=color if resolved else "none", mec="black", mew=0.45,
-                        color=color, markersize=4.5, linestyle="none")
+                ax.plot(ed_x, ed_y, marker="D", mfc=color if resolved else "white", mec="black", mew=0.75,
+                        color=color, markersize=5.2, linestyle="none", zorder=8)
                 if resolved:
                     ax.hlines(ed_y, float(item["U_S_ci95_low"]), float(item["U_S_ci95_high"]), color=color, lw=1.0)
                 else:
                     ax.hlines(ed_y, float(item["plateau_U_low_over_t"]), float(item["plateau_U_high_over_t"]), color=color, lw=1.0)
-        ax.axhline(0.0, color="0.55", lw=0.8, ls=":")
+        if zero_line:
+            ax.axhline(0.0, color="0.55", lw=0.8, ls=":")
         ax.set_xlabel(r"$U/t$")
         if index % 2 == 0:
-            ax.set_ylabel(r"$\Delta S_F/\ln D$")
+            ax.set_ylabel(y_label)
         panel_label(ax, index)
         sector_text(ax, int(L), int(N), int(nmax))
+    legend_handles = [
+        mpl.lines.Line2D([], [], linestyle="none", marker="*", markersize=7.0,
+                         markerfacecolor="0.55", markeredgecolor="black",
+                         label=r"channel theory $U_M^*$"),
+        mpl.lines.Line2D([], [], linestyle="none", marker="D", markersize=4.5,
+                         markerfacecolor="0.55", markeredgecolor="black",
+                         label=r"resolved ED $U_S^*$"),
+        mpl.lines.Line2D([], [], linestyle="none", marker="D", markersize=4.5,
+                         markerfacecolor="none", markeredgecolor="black",
+                         label="unresolved ED candidate"),
+    ]
+    fig.legend(handles=legend_handles, loc="upper center", bbox_to_anchor=(0.48, 0.995),
+               ncol=3, frameon=False, handletextpad=0.45, columnspacing=1.2)
+    fig.subplots_adjust(wspace=0.22, hspace=0.30, right=0.84, top=0.92)
     common_colorbar(fig, axes, norm, cmap, r"$W/t$")
-    fig.subplots_adjust(wspace=0.16, hspace=0.18, right=0.88)
-    save_figure(fig, output, "entropy_curves_L9", dpi)
+    save_figure(fig, output, stem, dpi)
 
 
 def plot_peak_positions(peaks: pd.DataFrame, theory: pd.DataFrame, output: Path, dpi: int) -> None:
@@ -240,6 +279,33 @@ def plot_peak_difference(peaks: pd.DataFrame, output: Path, dpi: int) -> None:
     save_figure(fig, output, "peak_difference_vs_W", dpi)
 
 
+def plot_peak_estimator_diagnostics(peaks: pd.DataFrame, output: Path, dpi: int) -> None:
+    required = {"U_S_local_quadratic_over_t", "U_S_smoothed_over_t"}
+    if not required.issubset(peaks.columns):
+        return
+    selected = main_sectors(peaks)
+    sectors = list(selected.groupby(["L", "N", "nmax"], sort=True))
+    if not sectors:
+        return
+    fig, axes = grid_axes(len(sectors), sharex=True, sharey=False)
+    for index, ((L, N, nmax), group) in enumerate(sectors):
+        ax = axes[index]
+        group = group.sort_values("W_over_t")
+        ax.plot(group["W_over_t"], group["U_S_local_quadratic_over_t"],
+                color="0.45", ls=":", marker="x", label="local quadratic")
+        ax.plot(group["W_over_t"], group["U_S_smoothed_over_t"],
+                color="#0072B2", ls="-", marker="o", label="smoothed estimator")
+        ax.set_xlabel(r"$W/t$")
+        if index % 2 == 0:
+            ax.set_ylabel(r"$U_S^*/t$")
+        panel_label(ax, index)
+        sector_text(ax, int(L), int(N), int(nmax))
+        if index == 0:
+            ax.legend(loc="upper left", frameon=False)
+    fig.subplots_adjust(wspace=0.22, hspace=0.25)
+    save_figure(fig, output, "peak_estimator_diagnostics", dpi)
+
+
 def plot_coefficients(coefficients: pd.DataFrame, output: Path, dpi: int) -> None:
     fig, axes = plt.subplots(2, 3, figsize=(7.05, 4.8))
     unit = coefficients[coefficients["L"] == coefficients["N"]]
@@ -276,7 +342,9 @@ def plot_effective_exponent(theory: pd.DataFrame, output: Path, dpi: int) -> Non
     fig, ax = plt.subplots(figsize=(3.55, 2.75))
     for index, ((L, N, nmax), group) in enumerate(selected.groupby(["L", "N", "nmax"], sort=True)):
         group = group.sort_values("W_over_t")
-        mask = np.isfinite(group["beta_eff"].to_numpy(dtype=float))
+        mask = np.isfinite(group["beta_eff"].to_numpy(dtype=float)) & (
+            group["W_over_t"].to_numpy(dtype=float) > 0.0
+        )
         ax.semilogx(group.loc[mask, "W_over_t"], group.loc[mask, "beta_eff"], marker=MARKERS[index % len(MARKERS)],
                     markevery=max(1, int(mask.sum()) // 8), label=r"$n_{{\max}}={}$".format(int(nmax)))
     ax.axhline(1.0, color="0.45", ls=":", label=r"$\beta=1$")
@@ -351,6 +419,7 @@ def plot_nmax_comparison(peaks: pd.DataFrame, output: Path, dpi: int) -> None:
             ax.plot([2], [y], marker="o", mfc="white", mec=color, mew=1.2, linestyle="none")
     ax.set_xlabel(r"$n_{\max}$")
     ax.set_ylabel(r"$U_S^*/t$")
+    fig.subplots_adjust(right=0.84)
     common_colorbar(fig, [ax], norm, cmap, r"$W/t$")
     save_figure(fig, output, "nmax_comparison_L9", dpi)
 
@@ -376,8 +445,8 @@ def plot_entropy_decomposition(curves: pd.DataFrame, output: Path, dpi: int) -> 
         ax.set_xlabel(r"$U/t$")
         ax.set_ylabel(label)
         panel_label(ax, index)
+    fig.subplots_adjust(wspace=0.38, right=0.84)
     common_colorbar(fig, axes, norm, cmap, r"$W/t$")
-    fig.subplots_adjust(wspace=0.38, right=0.88)
     save_figure(fig, output, "entropy_decomposition_Q", dpi)
 
 
@@ -392,6 +461,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--min-W", type=float, help="minimum W/t shown; defaults to the ED range")
+    parser.add_argument("--max-W", type=float, help="maximum W/t shown; defaults to the ED range")
     args = parser.parse_args()
     run_dir = args.run_dir.resolve()
     output = args.output_dir.resolve() if args.output_dir else run_dir / "figures"
@@ -401,10 +472,27 @@ def main() -> None:
     peaks = load_table(run_dir, "peak_summary.csv")
     theory = load_table(run_dir, "theory_peaks.csv")
     coefficients = load_table(run_dir, "theory_coefficients.csv")
+    minimum_W = float(args.min_W) if args.min_W is not None else float(peaks["W_over_t"].min())
+    maximum_W = float(args.max_W) if args.max_W is not None else float(peaks["W_over_t"].max())
+    if maximum_W < minimum_W:
+        raise SystemExit("--max-W must be greater than or equal to --min-W")
+    curves = restrict_W(curves, minimum_W, maximum_W)
+    peaks = restrict_W(peaks, minimum_W, maximum_W)
+    theory = restrict_W(theory, minimum_W, maximum_W)
     with mpl.rc_context(prb_style()):
-        plot_entropy_curves(curves, peaks, output, dpi)
+        plot_entropy_curves(
+            curves, peaks, output, dpi,
+            "delta_entropy_norm_mean", "delta_entropy_norm_paired_sem",
+            r"$\Delta S_F/\ln D$", "entropy_change_curves", zero_line=True,
+        )
+        plot_entropy_curves(
+            curves, peaks, output, dpi,
+            "entropy_norm_mean", "entropy_norm_sem",
+            r"$S_F/\ln D$", "entropy_absolute_curves",
+        )
         plot_peak_positions(peaks, theory, output, dpi)
         plot_peak_difference(peaks, output, dpi)
+        plot_peak_estimator_diagnostics(peaks, output, dpi)
         plot_coefficients(coefficients, output, dpi)
         plot_effective_exponent(theory, output, dpi)
         plot_peak_visibility(peaks, output, dpi)

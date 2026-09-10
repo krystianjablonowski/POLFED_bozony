@@ -252,10 +252,8 @@ def dry_run(config: Dict[str, Any], task_table: Optional[Path]) -> None:
 def empty_result_arrays(structure: core.BosonStructure, config: Dict[str, Any]) -> Dict[str, np.ndarray]:
     nev = core.requested_eigenpair_count(structure.dim, config["eigensolver"])
     nq = int(np.max(structure.interaction_q, initial=0)) + 1
-    return {
+    arrays = {
         "U_over_t": np.empty(0, dtype=float),
-        "energies_over_t": np.empty((0, nev), dtype=float),
-        "relative_residuals": np.empty((0, nev), dtype=float),
         "entropy": np.empty(0), "entropy_norm": np.empty(0),
         "entropy2": np.empty(0), "entropy2_norm": np.empty(0),
         "IPR": np.empty(0), "gap_ratio": np.empty(0), "gap_ratio_count": np.empty(0, dtype=int),
@@ -269,6 +267,10 @@ def empty_result_arrays(structure: core.BosonStructure, config: Dict[str, Any]) 
         "solver_backend": np.empty(0, dtype="U32"),
         "solver_retry_log_json": np.empty(0, dtype="U8192"),
     }
+    if bool(config["ed"].get("store_spectra", True)):
+        arrays["energies_over_t"] = np.empty((0, nev), dtype=float)
+        arrays["relative_residuals"] = np.empty((0, nev), dtype=float)
+    return arrays
 
 
 def load_existing_result(path: Path, expected_hash: str, structure: core.BosonStructure, config: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, np.ndarray]]:

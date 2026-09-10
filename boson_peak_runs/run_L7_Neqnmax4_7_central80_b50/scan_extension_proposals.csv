@@ -1,0 +1,2 @@
+L,N,nmax,W_over_t,recommended_action,reason,proposed_U_min_over_t,proposed_U_max_over_t,proposed_U_values_over_t_json,suggested_realizations
+7,4,4,2.1,refine_plateau,wide_plateau,0.35,0.425,"[0.35, 0.359375, 0.36875, 0.378125, 0.3875, 0.396875, 0.40625, 0.415625, 0.425]",200
