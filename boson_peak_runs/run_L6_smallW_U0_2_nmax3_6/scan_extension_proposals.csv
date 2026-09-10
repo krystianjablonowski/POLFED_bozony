@@ -1,0 +1,17 @@
+L,N,nmax,W_over_t,recommended_action,reason,proposed_U_min_over_t,proposed_U_max_over_t,proposed_U_values_over_t_json,suggested_realizations
+6,6,3,1.0,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,3,1.5,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,3,2.0,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,3,2.5,refine_near_U0,local_fit_rejected;scan_boundary;plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",200
+6,6,3,3.0,refine_near_U0,plateau_includes_U0;low_peak_significance;low_bootstrap_valid_fraction;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,3,3.5,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,3,4.0,refine_plateau,low_peak_significance;realization_limit_exceeded,0.1,0.2,"[0.1, 0.1125, 0.125, 0.1375, 0.15, 0.1625, 0.175, 0.1875, 0.2]",500
+6,6,3,4.5,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,3,5.0,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,4,3.0,refine_plateau,low_peak_significance;realization_limit_exceeded,0.3,0.4,"[0.3, 0.3125, 0.325, 0.3375, 0.35, 0.3625, 0.375, 0.3875, 0.4]",500
+6,6,4,3.5,refine_plateau,low_peak_significance;realization_limit_exceeded,0.2,0.30000000000000004,"[0.2, 0.2125, 0.225, 0.2375, 0.25, 0.2625, 0.275, 0.2875, 0.3]",500
+6,6,4,4.0,refine_plateau,wide_plateau;low_peak_significance;realization_limit_exceeded,0.1,0.4,"[0.1, 0.1375, 0.175, 0.2125, 0.25, 0.2875, 0.325, 0.3625, 0.4]",500
+6,6,4,4.5,refine_near_U0,plateau_includes_U0;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
+6,6,4,5.0,refine_near_U0,local_fit_rejected;scan_boundary;plateau_includes_U0;wide_plateau;low_peak_significance;low_bootstrap_valid_fraction,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",200
+6,6,5,4.5,refine_plateau,low_peak_significance;realization_limit_exceeded,0.2,0.30000000000000004,"[0.2, 0.2125, 0.225, 0.2375, 0.25, 0.2625, 0.275, 0.2875, 0.3]",500
+6,6,5,5.0,refine_near_U0,plateau_includes_U0;wide_plateau;low_peak_significance;realization_limit_exceeded,0.0,0.4,"[0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4]",500
