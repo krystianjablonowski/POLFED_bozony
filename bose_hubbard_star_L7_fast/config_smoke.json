@@ -8,7 +8,7 @@
   },
   "disorder": {
     "distribution": "uniform_minus_W_plus_W",
-    "master_seed": 12345
+    "master_seed": 20260907
   },
   "grid": {
     "W": {"start": 0.1, "stop": 0.2, "step": 0.1},
@@ -16,8 +16,9 @@
   },
   "sampling": {
     "n_disorder": 2,
-    "n_configurations": 16,
-    "energy_window_fraction": 0.5,
+    "central_selection": {"mode": "closest_count", "count": 20, "center": 0.5},
+    "n_configurations": 0,
+    "star_entropy_histogram_bins": 8,
     "samples_per_task": 2
   },
   "numerics": {
@@ -29,12 +30,17 @@
     "smoothing_window": 5,
     "smoothing_degree": 2,
     "peak_fit_points": 5,
+    "stability_fit_points": [3, 5],
+    "max_fit_window_spread": 0.05,
     "boundary_margin_points": 2,
     "bootstrap_replicates": 5,
     "bootstrap_seed": 42,
     "confidence_level": 0.95,
     "min_bootstrap_valid_fraction": 0.5,
-    "max_peak_ci_range_fraction": 0.5
+    "max_peak_ci_width": 0.1,
+    "fit_Wmin_values": [0.1],
+    "fit_Wmax": 0.2,
+    "write_raw_long_csv": true
   },
   "cluster": {
     "queue": "batch",
@@ -42,6 +48,6 @@
     "memory": "1gb"
   },
   "paths": {
-    "results": "results_smoke"
+    "results": "results_v3_smoke"
   }
 }

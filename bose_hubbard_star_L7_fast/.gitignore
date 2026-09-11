@@ -1,4 +1,5 @@
 results_*/
+_smoke_*/
 logs/
 __pycache__/
 .pytest_cache/

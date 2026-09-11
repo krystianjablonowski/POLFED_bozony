@@ -2,10 +2,11 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONFIG_PATH="${1:-$PROJECT_DIR/config_L7_pilot.json}"
+CONFIG_PATH="${1:-$PROJECT_DIR/config_L7_corrected.json}"
 PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"
 cd "$PROJECT_DIR"
 mkdir -p logs
+export PYTHONNOUSERSITE=1
 
 CONFIG_PATH="$("$PYTHON_BIN" - "$CONFIG_PATH" <<'PY'
 from pathlib import Path
@@ -60,4 +61,4 @@ else
 fi
 
 echo "After the workers finish, submit plotting with:"
-echo "qsub -l walltime=00:30:00,mem=2gb -o $PROJECT_DIR/logs/analyze.out -v CONFIG_PATH=$CONFIG_PATH,PROJECT_DIR=$PROJECT_DIR,PYTHON_BIN=$PYTHON_BIN $PROJECT_DIR/pbs_analyze.sh"
+echo "qsub -l walltime=01:00:00,mem=8gb -o $PROJECT_DIR/logs/analyze_corrected.out -v CONFIG_PATH=$CONFIG_PATH,PROJECT_DIR=$PROJECT_DIR,PYTHON_BIN=$PYTHON_BIN $PROJECT_DIR/pbs_analyze.sh"

@@ -1,36 +1,32 @@
-# Raport walidacji wersji 2.1.0
+# Raport walidacji wersji 3.0.0
 
-## Testy numeryczne
+Polecenie `python -m unittest discover -s tests -v` przechodzi 15/15 testów.
 
-Polecenie `python -m unittest discover -s tests -v` przechodzi 8/8 testów:
+Sprawdzone zostały:
 
-- dokładne wymiary baz dla `N=nmax=4,5,6,7`;
-- zgodność wektorowego solvera z niezależną diagonalizacją gwiazda po gwieździe;
-- `Sstar=S2=ln(2)` dla pojedynczego rezonansu oraz zero entropii dla `V=0`;
-- błąd normalizacji i tożsamości detuningu poniżej `1e-12`;
-- niezmienniczy wybór konfiguracji centralnych po zmianie kolejności bazy;
-- odzyskanie zadanego analitycznego maksimum paraboli.
+- wymiary baz `L=7` dla `N=nmax=4,5,6,7`;
+- zgodność diagonalizacji wektorowej ze skalarną implementacją referencyjną;
+- dokładne przypadki jednej krawędzi, rezonansu i zerowego sprzężenia;
+- zgodność bezpośredniego detuningu z formułą kanałową;
+- norma każdego wektora własnego do tolerancji `1e-12`;
+- dokładna zgodność realizacji nieporządku z konwencją seeda kodu ED;
+- wybór 20 konfiguracji najbliższych znormalizowanej energii `0.5`;
+- zachowanie wcześniejszej definicji `M` i jej niezależne przeliczenie;
+- równość macierzy gwiazdy i odpowiedniego lokalnego bloku niezależnie
+  zbudowanego pełnego Hamiltonianu `L=N=4`;
+- uruchomienie pełnej ED i modelu gwiazdy na tej samej małej realizacji;
+- niezmienniczość wszystkich głównych obserwabli na permutację kolejności bazy;
+- odzyskanie znanego maksimum paraboli oraz test stabilności okna 3/5/7.
 
-## Pomiar czasu
+Test end-to-end dla trzech wartości `W`, trzech realizacji i sektora `N=4`
+zakończył się poprawnie: powstały surowe NPZ, długi skompresowany CSV, tabele
+krzywych/maksimów/kanałów/rozkładu oraz wykresy PNG i PDF.
 
-Na lokalnym CPU jedno zadanie pilota (`30` realizacji, `121` wartości U,
-`128` konfiguracji centralnych) trwało około 6 s dla sektora `N=4` i 11--13 s
-dla najcięższego sektora `N=7`. Na klastrze każde `W` i każdy sektor jest
-osobnym elementem tablicy PBS.
+Poprzednich wyników wersji 2.x nie wolno łączyć z wersją 3.0. Plik każdego
+zadania zawiera wersję i SHA-256 części obliczeniowej konfiguracji; analiza
+odrzuca brakujące, stare albo niezgodne pliki.
 
-## Kontrola naukowa dwóch skrajnych wartości W
-
-To są wyłącznie wartości diagnostyczne z 30 realizacji, a nie wynik
-produkcyjny.
-
-- Dla `W/t=0.1` estymatory `M_sum`, `S2_sum` i `Sstar` mają maksimum przy
-  brzegu `U=0` zarówno dla `N=4`, jak i `N=7`. Program poprawnie zwraca
-  `U_peak=NaN, quality_flag=boundary`.
-- Dla `W/t=2.5` wewnętrzne maksima `Sstar` wyniosły w przybliżeniu:
-  `0.269, 0.163, 0.223, 0.290` odpowiednio dla `N=4,5,6,7`.
-
-Pierwsza obserwacja jest istotna: pokazane dane ED mają dodatnie maksimum także
-dla małego `W`, więc podstawowy model gwiazdy głębokości 1 może nie odtwarzać
-tego mechanizmu. Pełny pilot na wszystkich `W` ma rozstrzygnąć, czy i gdzie
-pojawia się poprawny trend. Nie jest stosowane żadne przesunięcie ani skala
-dopasowana do ED.
+Wersja 3.0 nie gwarantuje z góry, że fizyczny model głębokości 1 odtworzy ED.
+Gwarantuje natomiast, że brak maksimum nie będzie skutkiem podmiany definicji
+`M`, innego seeda, błędnego okna centralnego, globalnej zamiast lokalnej
+normalizacji lub cichego wpisania zera dla odrzuconego maksimum.

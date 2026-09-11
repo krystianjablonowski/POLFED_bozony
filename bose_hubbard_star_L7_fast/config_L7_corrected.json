@@ -1,0 +1,58 @@
+{
+  "model": {
+    "L": 7,
+    "t": 1.0,
+    "boundary": "open",
+    "interaction": "U_n_nminus1",
+    "sectors": [
+      {"N": 4, "nmax": 4},
+      {"N": 5, "nmax": 5},
+      {"N": 6, "nmax": 6},
+      {"N": 7, "nmax": 7}
+    ]
+  },
+  "disorder": {
+    "distribution": "uniform_minus_W_plus_W",
+    "master_seed": 20260907
+  },
+  "grid": {
+    "W": {"start": 0.8, "stop": 2.5, "step": 0.1},
+    "U": {"start": 0.0, "stop": 0.8, "step": 0.005}
+  },
+  "sampling": {
+    "n_disorder": 300,
+    "central_selection": {"mode": "closest_count", "count": 20, "center": 0.5},
+    "n_configurations": 0,
+    "star_entropy_histogram_bins": 40,
+    "samples_per_task": 300
+  },
+  "numerics": {
+    "tie_tolerance": 1e-12,
+    "detuning_tolerance": 1e-11,
+    "normalization_tolerance": 1e-12
+  },
+  "analysis": {
+    "smoothing_window": 9,
+    "smoothing_degree": 3,
+    "peak_fit_points": 5,
+    "stability_fit_points": [3, 5, 7],
+    "max_fit_window_spread": 0.02,
+    "boundary_margin_points": 4,
+    "bootstrap_replicates": 1000,
+    "bootstrap_seed": 9173,
+    "confidence_level": 0.95,
+    "min_bootstrap_valid_fraction": 0.8,
+    "max_peak_ci_width": 0.12,
+    "fit_Wmin_values": [0.8, 1.0, 1.2, 1.4],
+    "fit_Wmax": 2.5,
+    "write_raw_long_csv": true
+  },
+  "cluster": {
+    "queue": "batch",
+    "walltime": "01:00:00",
+    "memory": "2gb"
+  },
+  "paths": {
+    "results": "results_L7_corrected"
+  }
+}

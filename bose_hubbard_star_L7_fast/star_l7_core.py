@@ -5,11 +5,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import math
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 
 
-VERSION = "2.1.0"
+VERSION = "3.0.0"
 
 
 @dataclass(frozen=True)
@@ -83,15 +84,85 @@ def build_graph(L: int, N: int, nmax: int, t: float = 1.0) -> Graph:
     return Graph(basis, interaction, neighbors, couplings, channels, degree, from_site, to_site)
 
 
-def central_configurations(energies: np.ndarray, fraction: float, maximum: int, priority_rank: np.ndarray) -> np.ndarray:
+def central_configurations(
+    energies: np.ndarray,
+    selection: Union[dict, float],
+    maximum: int,
+    priority_rank: np.ndarray,
+) -> np.ndarray:
+    """Select diagonal configurations around normalized spectral center 1/2.
+
+    A numeric ``selection`` keeps the legacy rank-fraction mode only for
+    regression tests. Production configurations must name their mode.
+    """
     dim = len(energies)
-    window_count = max(1, min(dim, int(math.ceil(fraction * dim))))
-    order = np.argsort(energies, kind="stable")
-    start = (dim - window_count) // 2
-    eligible = order[start : start + window_count]
+    if isinstance(selection, (int, float)):
+        mode = "rank_fraction"
+        settings = {"fraction": float(selection)}
+    else:
+        settings = selection
+        mode = str(settings["mode"])
+    width = float(np.max(energies) - np.min(energies))
+    normalized = ((energies - float(np.min(energies))) / width
+                  if width > np.finfo(float).eps else np.full(dim, 0.5))
+    distance = np.abs(normalized - float(settings.get("center", 0.5)))
+    order = np.argsort(distance, kind="stable")
+    if mode == "closest_count":
+        count = max(1, min(dim, int(settings["count"])))
+        eligible = order[:count]
+    elif mode == "normalized_half_width":
+        half_width = float(settings["half_width"])
+        if not 0.0 < half_width <= 0.5:
+            raise ValueError("normalized_half_width must be in (0, 0.5]")
+        eligible = np.flatnonzero(distance <= half_width)
+        if len(eligible) == 0:
+            eligible = order[:1]
+    elif mode == "rank_fraction":
+        fraction = float(settings["fraction"])
+        count = max(1, min(dim, int(math.ceil(fraction * dim))))
+        eligible = order[:count]
+    else:
+        raise ValueError(f"Unknown central selection mode: {mode}")
     if maximum <= 0 or len(eligible) <= maximum:
         return eligible
     return eligible[np.argsort(priority_rank[eligible], kind="stable")[:maximum]]
+
+
+def compensating_channels(graph: Graph) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (k, |V|, q) for the original positive-k mixing model."""
+    records: dict[tuple[int, float], int] = {}
+    # One representative bond is sufficient; q counts Fock configurations.
+    for alpha in range(graph.dim):
+        for edge in range(int(graph.degree[alpha])):
+            if graph.from_site[alpha, edge] != 0 or graph.to_site[alpha, edge] != 1:
+                continue
+            k = int(graph.channels[alpha, edge])
+            if k > 0:
+                coupling = float(abs(graph.couplings[alpha, edge]))
+                records[(k, coupling)] = records.get((k, coupling), 0) + 1
+    if not records:
+        raise ValueError("No positive compensating channels")
+    ordered = sorted(records)
+    counts = np.asarray([records[key] for key in ordered], dtype=float)
+    return (np.asarray([key[0] for key in ordered], dtype=np.int16),
+            np.asarray([key[1] for key in ordered], dtype=float), counts / np.sum(counts))
+
+
+def compensating_observables(
+    U: float,
+    epsilon: np.ndarray,
+    graph: Graph,
+    channel_data: Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]] = None,
+) -> Tuple[float, float]:
+    """Existing project definition: k>0 channels and |epsilon_i-epsilon_j|."""
+    k, coupling, weight = channel_data if channel_data is not None else compensating_channels(graph)
+    bond_disorder = np.abs(np.diff(np.asarray(epsilon, dtype=float)))
+    delta = 2.0 * k[:, None] * float(U) - bond_disorder[None, :]
+    v2 = coupling[:, None] ** 2
+    mixing = 4.0 * v2 / (delta * delta + 4.0 * v2)
+    entropy = two_level_entropy(mixing)
+    return (float(np.sum(weight[:, None] * mixing) / len(bond_disorder)),
+            float(np.sum(weight[:, None] * entropy) / len(bond_disorder)))
 
 
 def entropy_from_probabilities(probabilities: np.ndarray, axis: int) -> np.ndarray:
@@ -108,7 +179,7 @@ def two_level_entropy(mixing: np.ndarray) -> np.ndarray:
     return entropy_from_probabilities(np.stack((p, 1.0 - p), axis=-1), axis=-1)
 
 
-def batch_star_metrics(delta: np.ndarray, coupling: np.ndarray, tie_tolerance: float) -> tuple[np.ndarray, np.ndarray, float]:
+def batch_star_metrics(delta: np.ndarray, coupling: np.ndarray, tie_tolerance: float) -> Tuple[np.ndarray, np.ndarray, float]:
     """Diagonalize a batch of equal-degree stars in one NumPy call."""
     count, z = delta.shape
     matrices = np.zeros((count, z + 1, z + 1), dtype=np.float64)
@@ -129,7 +200,7 @@ def batch_star_metrics(delta: np.ndarray, coupling: np.ndarray, tie_tolerance: f
     return entropy, participation, normalization_error
 
 
-def scalar_star_metrics(delta: np.ndarray, coupling: np.ndarray, tie_tolerance: float = 1e-12) -> tuple[float, float, float]:
+def scalar_star_metrics(delta: np.ndarray, coupling: np.ndarray, tie_tolerance: float = 1e-12) -> Tuple[float, float, float]:
     """Slow reference implementation used only by the validation suite."""
     delta = np.asarray(delta, dtype=float)
     coupling = np.asarray(coupling, dtype=float)
@@ -155,16 +226,17 @@ def observables_at_u(
     disorder_energy: np.ndarray,
     central: np.ndarray,
     tie_tolerance: float = 1e-12,
-) -> dict[str, float]:
+) -> Dict[str, object]:
     energies = U * graph.interaction + disorder_energy
     m_per_star = np.zeros(len(central), dtype=float)
     s2_per_star = np.zeros(len(central), dtype=float)
     star_entropy = np.zeros(len(central), dtype=float)
     star_participation = np.zeros(len(central), dtype=float)
     resonant = np.zeros(len(central), dtype=float)
-    edge_m_total = edge_s2_total = 0.0
-    edge_count = 0
     max_norm_error = 0.0
+    channel_m: dict[int, float] = {}
+    channel_s2: dict[int, float] = {}
+    channel_fraction: dict[int, float] = {}
 
     central_degrees = graph.degree[central]
     for z in np.unique(central_degrees):
@@ -182,15 +254,19 @@ def observables_at_u(
         star_entropy[positions] = entropy
         star_participation[positions] = participation
         resonant[positions] = np.sum(np.abs(delta) < 2.0 * np.abs(coupling), axis=1)
-        edge_m_total += float(np.sum(mixing))
-        edge_s2_total += float(np.sum(s2))
-        edge_count += int(mixing.size)
+        channels = graph.channels[alpha, :z]
+        for channel in np.unique(channels):
+            mask = channels == channel
+            per_star_count = np.sum(mask, axis=1)
+            channel_m[int(channel)] = channel_m.get(int(channel), 0.0) + float(np.sum(mixing * mask))
+            channel_s2[int(channel)] = channel_s2.get(int(channel), 0.0) + float(np.sum(s2 * mask))
+            channel_fraction[int(channel)] = channel_fraction.get(int(channel), 0.0) + float(np.sum(per_star_count / z))
         max_norm_error = max(max_norm_error, norm_error)
     return {
         "M_sum": float(np.mean(m_per_star)),
-        "M_per_edge": edge_m_total / edge_count,
+        "M_per_edge": float(np.mean(m_per_star / central_degrees)),
         "S2_sum": float(np.mean(s2_per_star)),
-        "S2_per_edge": edge_s2_total / edge_count,
+        "S2_per_edge": float(np.mean(s2_per_star / central_degrees)),
         "Sstar": float(np.mean(star_entropy)),
         "Sstar_median": float(np.median(star_entropy)),
         "Sstar_std": float(np.std(star_entropy, ddof=1)) if len(star_entropy) > 1 else 0.0,
@@ -198,6 +274,10 @@ def observables_at_u(
         "z_mean": float(np.mean(central_degrees)),
         "resonant_edges": float(np.mean(resonant)),
         "normalization_error": max_norm_error,
+        "Sstar_values": star_entropy,
+        "M_k": {k: value / len(central) for k, value in channel_m.items()},
+        "S2_k": {k: value / len(central) for k, value in channel_s2.items()},
+        "P_k": {k: value / len(central) for k, value in channel_fraction.items()},
     }
 
 
@@ -218,9 +298,16 @@ def verify_detuning(graph: Graph, U: float, epsilon: np.ndarray, seed: int = 0) 
     return float(max(errors, default=0.0))
 
 
-def deterministic_seed(master: int, N: int, sample_id: int) -> int:
-    words = np.random.SeedSequence([master, 7, N, sample_id]).generate_state(2, dtype=np.uint32)
+def deterministic_seed(master: int, L: int, sample_id: int) -> int:
+    """Match the ED convention SeedSequence([master_seed, L, realization])."""
+    words = np.random.SeedSequence([master, L, sample_id]).generate_state(2, dtype=np.uint32)
     return int(words[0]) | (int(words[1]) << 32)
+
+
+def disorder_vector(master: int, L: int, sample_id: int) -> np.ndarray:
+    """Return exactly the unit disorder vector used by the ED workflow."""
+    sequence = np.random.SeedSequence([int(master), int(L), int(sample_id)])
+    return np.random.default_rng(sequence).uniform(-1.0, 1.0, size=L)
 
 
 def configuration_priority(basis: np.ndarray, seed: int) -> np.ndarray:

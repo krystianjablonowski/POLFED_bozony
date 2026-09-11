@@ -13,16 +13,17 @@
   },
   "disorder": {
     "distribution": "uniform_minus_W_plus_W",
-    "master_seed": 20260911
+    "master_seed": 20260907
   },
   "grid": {
     "W": {"values": [0.8, 1.2, 1.6, 2.0, 2.5]},
-    "U": {"start": 0.0, "stop": 0.6, "step": 0.005}
+    "U": {"start": 0.0, "stop": 0.8, "step": 0.005}
   },
   "sampling": {
     "n_disorder": 300,
+    "central_selection": {"mode": "closest_count", "count": 20, "center": 0.5},
     "n_configurations": 0,
-    "energy_window_fraction": 0.5,
+    "star_entropy_histogram_bins": 40,
     "samples_per_task": 100
   },
   "numerics": {
@@ -33,13 +34,18 @@
   "analysis": {
     "smoothing_window": 9,
     "smoothing_degree": 3,
-    "peak_fit_points": 7,
-    "boundary_margin_points": 3,
+    "peak_fit_points": 5,
+    "stability_fit_points": [3, 5, 7],
+    "max_fit_window_spread": 0.02,
+    "boundary_margin_points": 4,
     "bootstrap_replicates": 1000,
     "bootstrap_seed": 9173,
     "confidence_level": 0.95,
     "min_bootstrap_valid_fraction": 0.8,
-    "max_peak_ci_range_fraction": 0.25
+    "max_peak_ci_width": 0.12,
+    "fit_Wmin_values": [0.8, 1.0, 1.2, 1.4],
+    "fit_Wmax": 2.5,
+    "write_raw_long_csv": true
   },
   "cluster": {
     "queue": "batch",
@@ -47,6 +53,6 @@
     "memory": "2gb"
   },
   "paths": {
-    "results": "results_L7_convergence"
+    "results": "results_L7_v3_convergence"
   }
 }

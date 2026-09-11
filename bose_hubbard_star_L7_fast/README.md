@@ -1,117 +1,101 @@
-# Szybki model gwiazdy Bosego–Hubbarda dla L=7
+# Poprawiony model gwiazdy Bosego–Hubbarda dla L=7
 
-To jest niezależna wersja 2.1 programu. Nie czyta wyników poprzedniej wersji i
-nie wykonuje pełnej diagonalizacji Hamiltonianu wielu ciał. Diagonalizuje tylko
-lokalne macierze gwiazdy o rozmiarze najwyżej `13 x 13`, grupami w jednej
-wektorowej operacji NumPy.
+Wersja 3.0 oblicza małe lokalne gwiazdy (maksymalnie `13 x 13`), a nie pełną
+diagonalizację modelu wielu ciał. Wyniki starszych wersji nie są zgodne z tym
+formatem i nie zostaną przez program wczytane.
 
-## Co dokładnie liczy pilot
+Najważniejsze konwencje:
 
-- `L=7`, otwarty łańcuch, `t=1`;
-- sektory `N=nmax=4,5,6,7`, zgodnie z czterema panelami danych ED;
-- Hamiltonian diagonalny
-  `U*sum_i n_i(n_i-1) + sum_i epsilon_i*n_i`;
-- niezależne `epsilon_i` jednostajne w `[-W,W]`;
-- `W/t=0.1,...,2.5` i `U/t=0,...,0.6` z krokiem `0.005`;
-- 30 realizacji nieporządku i maksymalnie 128 konfiguracji ze środkowej połowy
-  uporządkowanych energii diagonalnych;
-- 100 niezależnych zadań PBS: po jednym dla każdego sektora i wartości `W`.
+- otwarty łańcuch, `t=1` i `U*sum_i n_i(n_i-1)`;
+- `epsilon_i/W` jest niezależne i jednostajne na `[-1,1]`;
+- seed realizacji jest identyczny z ED:
+  `SeedSequence([master_seed, L, sample_id])`;
+- konfiguracje centralne to 20 stanów o energii diagonalnej najbliższej
+  znormalizowanemu środkowi widma `0.5`, zgodnie z wyborem 20 stanów ED;
+- `M_existing` zachowuje wcześniejszą definicję projektu (ważone kanały
+  kompensujące `k>0` i `|epsilon_i-epsilon_j|`);
+- `M_graph_sum`, `M_graph_per_edge`, `S2_graph_sum` i `S2_graph_per_edge`
+  liczą bezpośrednio wszystkie dozwolone krawędzie grafu Focka;
+- `Sstar` diagonalizuje gwiazdę złożoną z konfiguracji centralnej i wszystkich
+  jej sąsiadów; remisy maksymalnego nakładu są uśredniane.
 
-Pilot ma sprawdzić kształt i położenie maksimum. Dopiero po jego obejrzeniu
-należy zwiększać statystykę. Graniczne maksima nie są zapisywane jako zero:
-mają `U_peak=nan` oraz jawną flagę jakości.
+`config_L7_corrected.json` liczy `N=nmax=4,5,6,7`, `W/t=0.8,...,2.5`,
+`U/t=0,...,0.8` z krokiem `0.005` i 300 tych samych realizacji nieporządku dla
+każdego sektora i każdego `W`. Są 72 zadania PBS — po jednym na parę
+`(N,W)` — bez ograniczenia liczby zadań uruchamianych równocześnie po stronie
+skryptu. Scheduler Kruka decyduje, ile naprawdę uruchomi naraz.
 
-Ważne: to jest test hipotezy, a nie dopasowanie do danych ED. Program nie ma
-parametru przesuwającego maksimum do żądanej wartości. Jeżeli model gwiazdy
-głębokości 1 nie odtworzy krzywej ED, wynik ma to pokazać wprost.
-
-## Test lokalny
+## Test lokalny lub na Kruku
 
 ```bash
 python -m unittest discover -s tests -v
-python run_l7_star.py validate --config config_L7_pilot.json
+python run_l7_star.py validate --config config_L7_corrected.json
 ```
 
-## Wysłanie z Windows na Kruka
+Powinno przejść 15 testów. Testy obejmują niezależne zbudowanie małego pełnego
+Hamiltonianu dla `L=N=4`, porównanie jego lokalnego bloku z macierzą gwiazdy,
+zgodność seeda z ED, detuning, normalizację i niezmienniczość na permutację
+bazy.
 
-W PowerShellu lub CMD przejdź do katalogu `POLFED`, a następnie:
+## Wysłanie katalogu z Windows
+
+W CMD (jedna linia, bez znaku `` ` ``):
 
 ```text
+cd C:\Users\avoga\OneDrive\Dokumenty\POLFED
 scp -r bose_hubbard_star_L7_fast kj405942@kruk-host.fuw.edu.pl:/home/2/kj405942/POLFED_bosons/
 ```
 
 ## Uruchomienie na Kruku
 
 ```bash
-source /home/2/kj405942/conda_envs/boson_peak_analysis/bin/activate
+conda activate /home/2/kj405942/conda_envs/boson_peak_analysis
 cd /home/2/kj405942/POLFED_bosons/bose_hubbard_star_L7_fast
-chmod u+x pbs_worker.sh pbs_analyze.sh submit_pbs.sh cleanup_old_results_on_kruk.sh
+chmod u+rwx .
+chmod u+x pbs_worker.sh pbs_analyze.sh submit_pbs.sh
 python -m unittest discover -s tests -v
-python run_l7_star.py validate --config config_L7_pilot.json
-bash submit_pbs.sh
+python run_l7_star.py validate --config config_L7_corrected.json
+bash submit_pbs.sh config_L7_corrected.json
 ```
 
-Skrypt wypisze identyfikator tablicy PBS. Wszystkie 100 elementów tablicy jest
-zgłoszonych bez limitu równoczesności po stronie użytkownika; faktyczną liczbę
-uruchomionych naraz wybiera scheduler Kruka.
-
-Stan obliczeń:
+Sprawdzenie:
 
 ```bash
 qstat -u kj405942
-python run_l7_star.py status --config config_L7_pilot.json
+python run_l7_star.py status --config config_L7_corrected.json
 grep -R -n -E 'Traceback|Error|Killed|MemoryError|walltime' logs || true
 ```
 
-Gdy `status` pokaże `Complete 100/100`, uruchom krótką analizę i wykresy:
+Po komunikacie `Complete 72/72; missing 0`:
 
 ```bash
-qsub -l walltime=00:30:00,mem=2gb -o "$PWD/logs/analyze.out" \
-  -v CONFIG_PATH="$PWD/config_L7_pilot.json",PROJECT_DIR="$PWD",PYTHON_BIN="$(command -v python)" \
+qsub -l walltime=01:00:00,mem=8gb -o "$PWD/logs/analyze_corrected.out" \
+  -v CONFIG_PATH="$PWD/config_L7_corrected.json",PROJECT_DIR="$PWD",PYTHON_BIN="$(command -v python)" \
   pbs_analyze.sh
 ```
 
-Po zakończeniu powinny istnieć `results_L7_pilot/analysis/peaks.csv`,
-`curves.csv`, `summary.txt` oraz figury PNG/PDF. Analiza odmawia startu, jeśli
-choć jedno zadanie jest brakujące albo uszkodzone.
+Analiza zapisuje m.in. `peaks.csv`, `fits.csv`, `direct_fits.csv`,
+`channels.csv`, rozkład lokalnej entropii, skompresowany surowy CSV,
+`summary.txt` oraz PNG/PDF. Maksima brzegowe i niestabilne nie są zamieniane na
+zera — dostają `NaN` i jawną flagę jakości.
 
-## Usunięcie błędnych wyników poprzedniej wersji
+Opcjonalne porównanie z ED: dodaj do `paths` w konfiguracji
+`"ed_peaks_csv": "sciezka/do/plik.csv"`. CSV powinien zawierać `N`, `nmax`,
+`W_over_t` oraz `U_peak` (albo `U_S_star_over_t`). Program zapisze reszty i
+RMSE bez dopasowywania modelu do danych ED.
 
-Ta operacja jest nieodwracalna. Skrypt pokazuje rozmiar i wymaga wpisania
-`DELETE`; usuwa tylko `results_L7_L8` i stare logi, a zachowuje kod źródłowy:
+## GitHub
 
-```bash
-bash cleanup_old_results_on_kruk.sh
-```
-
-## GitHub po weryfikacji pilota
-
-Wyniki są domyślnie ignorowane przez Git, żeby nie wysłać dziesiątek megabajtów
-surowych plików. Najpierw dodaj sam kod i małe tabele/figury analizy:
+Surowych `task_*.npz` nie należy wysyłać. Z katalogu repozytorium:
 
 ```bash
 cd /home/2/kj405942/POLFED_bosons
-git add bose_hubbard_star_L7_fast ':!bose_hubbard_star_L7_fast/results_L7_pilot/raw'
-git add -f bose_hubbard_star_L7_fast/results_L7_pilot/analysis
-git commit -m "Add fast L7 Bose-Hubbard star-model pilot"
+git add bose_hubbard_star_L7_fast
+git add -f bose_hubbard_star_L7_fast/results_L7_corrected/analysis
+git status --short
+git commit -m "Correct L7 Bose-Hubbard star-model analysis"
 git push origin HEAD
 ```
 
-Przed `git commit` warto wykonać `git status --short` i sprawdzić, czy w staged
-changes nie ma surowych plików `task_*.npz`.
-
-## Test zbieżności po pilocie
-
-`config_L7_convergence.json` liczy pięć kontrolnych wartości
-`W/t=0.8,1.2,1.6,2.0,2.5`, 300 realizacji oraz wszystkie konfiguracje ze
-środkowej połowy energii. Powstaje 60 zadań (4 sektory x 5 wartości W x 3
-części po 100 realizacji):
-
-```bash
-bash submit_pbs.sh config_L7_convergence.json
-python run_l7_star.py status --config config_L7_convergence.json
-```
-
-Analizę należy uruchomić dopiero po `Complete 60/60; missing 0`, z limitem
-jednego wątku OpenBLAS. Odrzucone kandydaty maksimum są oznaczone krzyżykami;
-nie są łączone linią ani przedstawiane jako poprawne maksima.
+Przed commitem sprawdź, czy na liście nie ma katalogu
+`results_L7_corrected/raw`. Jest ignorowany przez `.gitignore`.
