@@ -1,0 +1,15 @@
+Bose-Hubbard star-model analysis
+Valid interior parabolic peaks: 146/630.
+L=7 N=5 nmax=5 M_sum: c=0.00201424, R2=0.036481, eta_to_M=1
+L=7 N=5 nmax=5 S2_sum: c=0.000985629, R2=0.0099098, eta_to_M=-1.1114
+L=7 N=5 nmax=5 Sstar_mean: c=0.172314, R2=0.9509, eta_to_M=-192.674
+L=7 N=6 nmax=6 Sstar_mean: c=0.255629, R2=0.87042, eta_to_M=nan
+L=7 N=7 nmax=7 M_sum: c=0.00306934, R2=0.77186, eta_to_M=1
+L=7 N=7 nmax=7 S2_sum: c=0.0019724, R2=0.2435, eta_to_M=3.18765
+L=7 N=7 nmax=7 Sstar_mean: c=0.00257883, R2=0.63513, eta_to_M=0.866641
+L=8 N=5 nmax=5 M_sum: c=0.00492371, R2=0.20973, eta_to_M=1
+L=8 N=5 nmax=5 S2_sum: c=0.00629514, R2=0.28644, eta_to_M=1.27853
+L=8 N=5 nmax=5 Sstar_mean: c=0.180653, R2=0.93157, eta_to_M=331.246
+L=8 N=6 nmax=6 Sstar_mean: c=0.251078, R2=0.90653, eta_to_M=nan
+L=8 N=7 nmax=7 Sstar_mean: c=0.108545, R2=0.92538, eta_to_M=nan
+This run contains no ED data; compare peaks.csv directly with the existing ED maxima.
