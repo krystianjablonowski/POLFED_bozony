@@ -99,3 +99,19 @@ git push origin HEAD
 
 Przed `git commit` warto wykonać `git status --short` i sprawdzić, czy w staged
 changes nie ma surowych plików `task_*.npz`.
+
+## Test zbieżności po pilocie
+
+`config_L7_convergence.json` liczy pięć kontrolnych wartości
+`W/t=0.8,1.2,1.6,2.0,2.5`, 300 realizacji oraz wszystkie konfiguracje ze
+środkowej połowy energii. Powstaje 60 zadań (4 sektory x 5 wartości W x 3
+części po 100 realizacji):
+
+```bash
+bash submit_pbs.sh config_L7_convergence.json
+python run_l7_star.py status --config config_L7_convergence.json
+```
+
+Analizę należy uruchomić dopiero po `Complete 60/60; missing 0`, z limitem
+jednego wątku OpenBLAS. Odrzucone kandydaty maksimum są oznaczone krzyżykami;
+nie są łączone linią ani przedstawiane jako poprawne maksima.

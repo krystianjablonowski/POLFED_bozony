@@ -1,0 +1,52 @@
+{
+  "model": {
+    "L": 7,
+    "t": 1.0,
+    "boundary": "open",
+    "interaction": "U_n_nminus1",
+    "sectors": [
+      {"N": 4, "nmax": 4},
+      {"N": 5, "nmax": 5},
+      {"N": 6, "nmax": 6},
+      {"N": 7, "nmax": 7}
+    ]
+  },
+  "disorder": {
+    "distribution": "uniform_minus_W_plus_W",
+    "master_seed": 20260911
+  },
+  "grid": {
+    "W": {"values": [0.8, 1.2, 1.6, 2.0, 2.5]},
+    "U": {"start": 0.0, "stop": 0.6, "step": 0.005}
+  },
+  "sampling": {
+    "n_disorder": 300,
+    "n_configurations": 0,
+    "energy_window_fraction": 0.5,
+    "samples_per_task": 100
+  },
+  "numerics": {
+    "tie_tolerance": 1e-12,
+    "detuning_tolerance": 1e-11,
+    "normalization_tolerance": 1e-12
+  },
+  "analysis": {
+    "smoothing_window": 9,
+    "smoothing_degree": 3,
+    "peak_fit_points": 7,
+    "boundary_margin_points": 3,
+    "bootstrap_replicates": 1000,
+    "bootstrap_seed": 9173,
+    "confidence_level": 0.95,
+    "min_bootstrap_valid_fraction": 0.8,
+    "max_peak_ci_range_fraction": 0.25
+  },
+  "cluster": {
+    "queue": "batch",
+    "walltime": "01:00:00",
+    "memory": "2gb"
+  },
+  "paths": {
+    "results": "results_L7_convergence"
+  }
+}

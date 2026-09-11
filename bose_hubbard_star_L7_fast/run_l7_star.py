@@ -45,6 +45,13 @@ def load_config(path: Path) -> dict:
 
 
 def regular_grid(spec: dict) -> np.ndarray:
+    if "values" in spec:
+        values = np.asarray(spec["values"], dtype=float)
+        if values.ndim != 1 or len(values) == 0 or not np.all(np.isfinite(values)):
+            raise ValueError(f"Invalid explicit grid: {spec}")
+        if np.any(np.diff(values) <= 0):
+            raise ValueError(f"Explicit grid must be strictly increasing: {spec}")
+        return values
     start, stop, step = map(float, (spec["start"], spec["stop"], spec["step"]))
     count = int(round((stop - start) / step))
     values = start + step * np.arange(count + 1)
@@ -84,9 +91,17 @@ def validate(cfg: dict) -> None:
     for sector in cfg["model"]["sectors"]:
         graph = build_graph(7, int(sector["N"]), int(sector["nmax"]), float(cfg["model"]["t"]))
         print(f"L=7 N={sector['N']} nmax={sector['nmax']}: dim={graph.dim}, zmax={graph.neighbors.shape[1]}")
-    print(f"U/t=[{U[0]:g},{U[-1]:g}], dU={U[1]-U[0]:g}, points={len(U)}")
-    print(f"W/t=[{W[0]:g},{W[-1]:g}], dW={W[1]-W[0]:g}, points={len(W)}")
-    print(f"disorder={cfg['sampling']['n_disorder']}, configurations={cfg['sampling']['n_configurations']}, tasks={len(tasks(cfg))}")
+    if "values" in cfg["grid"]["U"]:
+        print(f"U/t values={U.tolist()}, points={len(U)}")
+    else:
+        print(f"U/t=[{U[0]:g},{U[-1]:g}], dU={U[1]-U[0]:g}, points={len(U)}")
+    if "values" in cfg["grid"]["W"]:
+        print(f"W/t values={W.tolist()}, points={len(W)}")
+    else:
+        print(f"W/t=[{W[0]:g},{W[-1]:g}], dW={W[1]-W[0]:g}, points={len(W)}")
+    configuration_count = int(cfg["sampling"]["n_configurations"])
+    configuration_label = "all eligible" if configuration_count <= 0 else str(configuration_count)
+    print(f"disorder={cfg['sampling']['n_disorder']}, configurations={configuration_label}, tasks={len(tasks(cfg))}")
     print("Hamiltonian: H_diag = U*sum_i n_i(n_i-1) + sum_i epsilon_i*n_i")
     print("Disorder: independent epsilon_i/W uniform on [-1,1]")
     print("No full many-body diagonalization; batched local star matrices only.")
@@ -309,10 +324,23 @@ def analyze(cfg: dict, no_plots: bool = False) -> None:
                               "bootstrap_valid": len(boot), "n_disorder": len(values)})
     write_csv(analysis_dir / "curves.csv", curve_rows)
     write_csv(analysis_dir / "peaks.csv", peak_rows)
+    quality_rows = []
+    for N, nmax in sorted({(row["N"], row["nmax"]) for row in peak_rows}):
+        for observable in OBSERVABLES:
+            selected = [row for row in peak_rows if (row["N"], row["nmax"], row["observable"]) == (N, nmax, observable)]
+            for flag in sorted({row["quality_flag"] for row in selected}):
+                quality_rows.append({"L": 7, "N": N, "nmax": nmax, "observable": observable,
+                                     "quality_flag": flag,
+                                     "count": sum(row["quality_flag"] == flag for row in selected),
+                                     "total_W": len(selected)})
+    write_csv(analysis_dir / "quality_counts.csv", quality_rows)
     if not no_plots:
         make_figures(cfg, curves, peak_rows, figure_dir)
     valid = sum(row["quality_flag"] == "ok" for row in peak_rows)
+    flag_counts = {flag: sum(row["quality_flag"] == flag for row in peak_rows)
+                   for flag in sorted({row["quality_flag"] for row in peak_rows})}
     summary = (f"L=7 vectorized star model v{VERSION}\nValid peaks: {valid}/{len(peak_rows)}\n"
+               f"Quality flags: {flag_counts}\n"
                f"U range: {U[0]:g}..{U[-1]:g}; W range: {regular_grid(cfg['grid']['W'])[0]:g}..{regular_grid(cfg['grid']['W'])[-1]:g}\n")
     (analysis_dir / "summary.txt").write_text(summary, encoding="utf-8")
     print(summary)
@@ -327,14 +355,22 @@ def make_figures(cfg: dict, curves: dict, peaks: list[dict], output: Path) -> No
     selected_W = W_values[::max(1, len(W_values)//6)]
     for N, nmax in sorted({key[:2] for key in curves}):
         fig, ax = plt.subplots(figsize=(4.4,3.2))
+        rejected_plotted = False
         for observable in OBSERVABLES:
             valid = sorted([r for r in peaks if (r["N"],r["nmax"],r["observable"],r["quality_flag"]) == (N,nmax,observable,"ok")], key=lambda r:r["W_over_t"])
-            if not valid:
-                continue
-            lower = [max(0,r["U_peak"]-r["U_peak_ci_low"]) if np.isfinite(r["U_peak_ci_low"]) else 0 for r in valid]
-            upper = [max(0,r["U_peak_ci_high"]-r["U_peak"]) if np.isfinite(r["U_peak_ci_high"]) else 0 for r in valid]
-            ax.errorbar([r["W_over_t"] for r in valid], [r["U_peak"] for r in valid], yerr=[lower,upper],
-                        marker="o", ms=3, capsize=2, color=colors[observable], label=observable)
+            if valid:
+                lower = [max(0,r["U_peak"]-r["U_peak_ci_low"]) if np.isfinite(r["U_peak_ci_low"]) else 0 for r in valid]
+                upper = [max(0,r["U_peak_ci_high"]-r["U_peak"]) if np.isfinite(r["U_peak_ci_high"]) else 0 for r in valid]
+                ax.errorbar([r["W_over_t"] for r in valid], [r["U_peak"] for r in valid], yerr=[lower,upper],
+                            fmt="o", linestyle="none", ms=4, capsize=2, color=colors[observable], label=observable)
+            rejected = sorted([r for r in peaks if (r["N"],r["nmax"],r["observable"]) == (N,nmax,observable)
+                               and r["quality_flag"] != "ok"], key=lambda r:r["W_over_t"])
+            if rejected:
+                candidate = [r["U_peak"] if np.isfinite(r["U_peak"]) else r["grid_argmax"] for r in rejected]
+                label = "rejected candidate" if not rejected_plotted else None
+                ax.plot([r["W_over_t"] for r in rejected], candidate, linestyle="none", marker="x",
+                        ms=4, alpha=0.45, color=colors[observable], label=label)
+                rejected_plotted = True
         ax.set(xlabel=r"$W/t$", ylabel=r"$U^*/t$", title=rf"$L=7,N=n_{{max}}={N}$")
         if ax.lines:
             ax.legend(frameon=False)

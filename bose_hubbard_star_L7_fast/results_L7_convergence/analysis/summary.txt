@@ -1,0 +1,4 @@
+L=7 vectorized star model v2.1.0
+Valid peaks: 9/60
+Quality flags: {'boundary': 44, 'ok': 9, 'unstable_bootstrap': 6, 'wide_ci': 1}
+U range: 0..0.6; W range: 0.8..2.5

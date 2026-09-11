@@ -18,7 +18,7 @@ from star_l7_core import (
     two_level_entropy,
     verify_detuning,
 )
-from run_l7_star import locate_peak, smoothing_matrix
+from run_l7_star import locate_peak, regular_grid, smoothing_matrix
 
 
 class StarL7Tests(unittest.TestCase):
@@ -90,6 +90,10 @@ class StarL7Tests(unittest.TestCase):
         result = locate_peak(x, y, cfg, smoothing_matrix(len(x), 9, 3))
         self.assertEqual(result["quality_flag"], "ok")
         self.assertLess(abs(result["U_peak"]-0.273), 1e-12)
+
+    def test_explicit_parameter_grid(self):
+        values = regular_grid({"values": [0.8, 1.2, 1.6, 2.0, 2.5]})
+        np.testing.assert_array_equal(values, [0.8, 1.2, 1.6, 2.0, 2.5])
 
 
 if __name__ == "__main__":
