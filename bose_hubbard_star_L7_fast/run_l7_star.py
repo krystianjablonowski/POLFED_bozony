@@ -19,7 +19,7 @@ import numpy as np
 from star_l7_core import (
     VERSION, build_graph, central_configurations, compensating_channels,
     compensating_observables, configuration_priority, deterministic_seed,
-    disorder_vector, observables_at_u, verify_detuning,
+    disorder_vector, filter_graph, observables_at_u, verify_detuning,
 )
 
 
@@ -116,6 +116,9 @@ def validate(cfg: dict) -> None:
     supported = ("closest_count", "normalized_half_width", "rank_fraction")
     if not isinstance(selection, dict) or selection.get("mode") not in supported:
         raise ValueError("sampling.central_selection must explicitly define a supported mode")
+    edge_filter = str(cfg["model"].get("star_edge_filter", "all"))
+    if edge_filter not in ("all", "positive_k"):
+        raise ValueError("model.star_edge_filter must be all or positive_k")
     U, W = regular_grid(cfg["grid"]["U"]), regular_grid(cfg["grid"]["W"])
     if len(U) < 7:
         raise ValueError("At least seven U points are required")
@@ -130,7 +133,9 @@ def validate(cfg: dict) -> None:
     print("Disorder: eta=epsilon/W ~ Uniform[-1,1]; SeedSequence([master_seed,L,sample_id])")
     print("M_existing/S2_existing: preserved positive-k compensating-channel model")
     print("M_graph_*/S2_graph_*: every directed one-hop edge, direct detuning")
-    print("Sstar: all one-hop neighbours; maximum-overlap ties are averaged")
+    print("Sstar: selected one-hop neighbours; maximum-overlap ties are averaged")
+    print("Star edge filter: {}{}".format(
+        edge_filter, " (diagnostic control, not the full model)" if edge_filter != "all" else ""))
     print("Production workers perform no full many-body diagonalization.")
 
 
@@ -203,8 +208,9 @@ def worker(cfg: dict, task_id: int) -> None:
         return
 
     N, nmax, W = task["N"], task["nmax"], task["W"]
-    graph = build_graph(7, N, nmax, float(cfg["model"]["t"]))
-    old_channels = compensating_channels(graph)
+    full_graph = build_graph(7, N, nmax, float(cfg["model"]["t"]))
+    old_channels = compensating_channels(full_graph)
+    graph = filter_graph(full_graph, str(cfg["model"].get("star_edge_filter", "all")))
     valid_k = sorted({int(graph.channels[a, e]) for a in range(graph.dim) for e in range(int(graph.degree[a]))})
     channel_k = np.asarray(valid_k, dtype=np.int16)
     channel_index = {int(k): i for i, k in enumerate(channel_k)}
@@ -231,7 +237,7 @@ def worker(cfg: dict, task_id: int) -> None:
         seeds[si], eta_vectors[si] = seed, eta
         disorder_energy = graph.basis @ epsilon
         priority = configuration_priority(graph.basis, seed)
-        error = verify_detuning(graph, float(U_values[len(U_values) // 2]), epsilon, seed & 0xFFFFFFFF)
+        error = verify_detuning(full_graph, float(U_values[len(U_values) // 2]), epsilon, seed & 0xFFFFFFFF)
         if error > float(cfg["numerics"]["detuning_tolerance"]):
             raise RuntimeError("detuning identity error {:.3e}".format(error))
         for ui, U in enumerate(U_values):
@@ -240,7 +246,7 @@ def worker(cfg: dict, task_id: int) -> None:
             result = observables_at_u(graph, float(U), disorder_energy, central, tie_tolerance)
             if float(result["normalization_error"]) > float(cfg["numerics"]["normalization_tolerance"]):
                 raise RuntimeError("normalization error {:.3e}".format(result["normalization_error"]))
-            m_old, s2_old = compensating_observables(float(U), epsilon, graph, old_channels)
+            m_old, s2_old = compensating_observables(float(U), epsilon, full_graph, old_channels)
             mapped = {
                 "M_existing": m_old, "S2_existing": s2_old,
                 "M_graph_sum": result["M_sum"], "S2_graph_sum": result["S2_sum"],

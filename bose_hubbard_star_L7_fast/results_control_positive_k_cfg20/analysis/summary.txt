@@ -1,0 +1,6 @@
+L=7 star model v3.0.0
+Valid model peaks: 33/70
+Quality flags: {'boundary': 27, 'ok': 33, 'unstable_bootstrap': 8, 'wide_ci': 2}
+Central selection: {"center": 0.5, "count": 20, "mode": "closest_count"}
+Paired bootstrap uses the same sample resampling for all W and observables.
+No ED peaks CSV configured; ED comparison was not performed.

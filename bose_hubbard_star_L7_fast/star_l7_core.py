@@ -84,6 +84,39 @@ def build_graph(L: int, N: int, nmax: int, t: float = 1.0) -> Graph:
     return Graph(basis, interaction, neighbors, couplings, channels, degree, from_site, to_site)
 
 
+def filter_graph(graph: Graph, mode: str) -> Graph:
+    """Return a graph restricted to a diagnostic channel subset.
+
+    ``all`` is the model from the instruction. ``positive_k`` is a control
+    experiment matching the channel sign retained by the historical M model.
+    """
+    if mode == "all":
+        return graph
+    if mode != "positive_k":
+        raise ValueError("Unknown star edge filter: {}".format(mode))
+    selected_rows = []
+    for alpha in range(graph.dim):
+        z = int(graph.degree[alpha])
+        selected_rows.append(np.flatnonzero(graph.channels[alpha, :z] > 0))
+    degree = np.asarray([len(row) for row in selected_rows], dtype=np.int16)
+    zmax = int(np.max(degree, initial=0))
+    neighbors = np.zeros((graph.dim, zmax), dtype=np.int32)
+    couplings = np.zeros((graph.dim, zmax), dtype=np.float64)
+    channels = np.zeros((graph.dim, zmax), dtype=np.int16)
+    from_site = np.zeros((graph.dim, zmax), dtype=np.int16)
+    to_site = np.zeros((graph.dim, zmax), dtype=np.int16)
+    for alpha, old_edges in enumerate(selected_rows):
+        count = len(old_edges)
+        if count:
+            neighbors[alpha, :count] = graph.neighbors[alpha, old_edges]
+            couplings[alpha, :count] = graph.couplings[alpha, old_edges]
+            channels[alpha, :count] = graph.channels[alpha, old_edges]
+            from_site[alpha, :count] = graph.from_site[alpha, old_edges]
+            to_site[alpha, :count] = graph.to_site[alpha, old_edges]
+    return Graph(graph.basis, graph.interaction, neighbors, couplings, channels,
+                 degree, from_site, to_site)
+
+
 def central_configurations(
     energies: np.ndarray,
     selection: Union[dict, float],
@@ -264,9 +297,13 @@ def observables_at_u(
         max_norm_error = max(max_norm_error, norm_error)
     return {
         "M_sum": float(np.mean(m_per_star)),
-        "M_per_edge": float(np.mean(m_per_star / central_degrees)),
+        "M_per_edge": float(np.mean(np.divide(
+            m_per_star, central_degrees, out=np.zeros_like(m_per_star),
+            where=central_degrees > 0))),
         "S2_sum": float(np.mean(s2_per_star)),
-        "S2_per_edge": float(np.mean(s2_per_star / central_degrees)),
+        "S2_per_edge": float(np.mean(np.divide(
+            s2_per_star, central_degrees, out=np.zeros_like(s2_per_star),
+            where=central_degrees > 0))),
         "Sstar": float(np.mean(star_entropy)),
         "Sstar_median": float(np.median(star_entropy)),
         "Sstar_std": float(np.std(star_entropy, ddof=1)) if len(star_entropy) > 1 else 0.0,

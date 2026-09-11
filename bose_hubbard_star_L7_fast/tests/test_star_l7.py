@@ -17,6 +17,7 @@ from star_l7_core import (
     configuration_priority,
     deterministic_seed,
     disorder_vector,
+    filter_graph,
     generate_basis,
     observables_at_u,
     scalar_star_metrics,
@@ -106,6 +107,22 @@ class StarL7Tests(unittest.TestCase):
         self.assertAlmostEqual(actual_m, expected_m, places=14)
         self.assertAlmostEqual(actual_s, expected_s, places=14)
 
+    def test_positive_k_control_contains_only_requested_edges(self):
+        full = build_graph(7, 7, 7)
+        restricted = filter_graph(full, "positive_k")
+        self.assertIs(filter_graph(full, "all"), full)
+        self.assertTrue(np.any(restricted.degree < full.degree))
+        for alpha in range(restricted.dim):
+            z = int(restricted.degree[alpha])
+            self.assertTrue(np.all(restricted.channels[alpha, :z] > 0))
+            for edge in range(z):
+                beta = restricted.neighbors[alpha, edge]
+                matches = np.flatnonzero(full.neighbors[alpha, :full.degree[alpha]] == beta)
+                self.assertTrue(len(matches) >= 1)
+                self.assertAlmostEqual(
+                    restricted.couplings[alpha, edge], full.couplings[alpha, matches[0]], places=14
+                )
+
     def test_star_matrix_is_the_full_hamiltonian_local_block(self):
         graph = build_graph(4, 4, 4)
         U = 0.27
@@ -124,6 +141,27 @@ class StarL7Tests(unittest.TestCase):
         expected[0, 1:] = graph.couplings[alpha, :z]
         expected[1:, 0] = graph.couplings[alpha, :z]
         np.testing.assert_allclose(extracted, expected, atol=1e-14)
+
+    def test_every_star_block_matches_independent_full_hamiltonian(self):
+        graph = build_graph(4, 4, 4)
+        rng = np.random.default_rng(881)
+        for _ in range(4):
+            U = float(rng.uniform(0.0, 0.8))
+            epsilon = rng.uniform(-2.5, 2.5, size=4)
+            diagonal = U * graph.interaction + graph.basis @ epsilon
+            full = np.diag(diagonal.astype(float))
+            for alpha in range(graph.dim):
+                z = int(graph.degree[alpha])
+                full[alpha, graph.neighbors[alpha, :z]] = graph.couplings[alpha, :z]
+            for alpha in range(graph.dim):
+                z = int(graph.degree[alpha])
+                indices = np.concatenate(([alpha], graph.neighbors[alpha, :z]))
+                extracted = full[np.ix_(indices, indices)] - np.eye(z + 1) * diagonal[alpha]
+                star = np.zeros((z + 1, z + 1))
+                star[1:, 1:] = np.diag(diagonal[indices[1:]] - diagonal[alpha])
+                star[0, 1:] = graph.couplings[alpha, :z]
+                star[1:, 0] = graph.couplings[alpha, :z]
+                np.testing.assert_allclose(extracted, star, atol=1e-13)
 
     def test_small_full_ed_and_star_same_disorder_are_finite(self):
         graph = build_graph(4, 4, 4)
