@@ -1,0 +1,47 @@
+{
+  "model": {
+    "L": 7,
+    "t": 1.0,
+    "boundary": "open",
+    "interaction": "U_n_nminus1",
+    "sectors": [{"N": 4, "nmax": 4}]
+  },
+  "disorder": {
+    "distribution": "uniform_minus_W_plus_W",
+    "master_seed": 12345
+  },
+  "grid": {
+    "W": {"start": 0.1, "stop": 0.2, "step": 0.1},
+    "U": {"start": 0.0, "stop": 0.1, "step": 0.01}
+  },
+  "sampling": {
+    "n_disorder": 2,
+    "n_configurations": 16,
+    "energy_window_fraction": 0.5,
+    "samples_per_task": 2
+  },
+  "numerics": {
+    "tie_tolerance": 1e-12,
+    "detuning_tolerance": 1e-11,
+    "normalization_tolerance": 1e-12
+  },
+  "analysis": {
+    "smoothing_window": 5,
+    "smoothing_degree": 2,
+    "peak_fit_points": 5,
+    "boundary_margin_points": 2,
+    "bootstrap_replicates": 5,
+    "bootstrap_seed": 42,
+    "confidence_level": 0.95,
+    "min_bootstrap_valid_fraction": 0.5,
+    "max_peak_ci_range_fraction": 0.5
+  },
+  "cluster": {
+    "queue": "batch",
+    "walltime": "00:10:00",
+    "memory": "1gb"
+  },
+  "paths": {
+    "results": "results_smoke"
+  }
+}
