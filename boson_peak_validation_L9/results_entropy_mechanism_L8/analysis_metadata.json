@@ -1,0 +1,16 @@
+{
+  "analysis_version": "1.0.0",
+  "run_dir": "/home/2/kj405942/POLFED_bosons/boson_peak_runs/run_L8_Neqnmax5_8_central80_b50",
+  "bootstrap": 2000,
+  "bootstrap_seed": 20260913,
+  "min_W": 0.8,
+  "max_W": 2.5,
+  "fit_W_minima": [
+    0.8,
+    1.0,
+    1.2
+  ],
+  "max_spread_steps": 1.5,
+  "entropy_identity_tolerance": 1e-10,
+  "entropy_identity_max_error": 7.105427357601002e-15
+}

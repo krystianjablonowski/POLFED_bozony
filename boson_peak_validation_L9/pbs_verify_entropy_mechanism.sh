@@ -18,10 +18,11 @@ PROJECT_DIR="${PROJECT_DIR:?PROJECT_DIR is required}"
 RUN_DIR="${RUN_DIR:?RUN_DIR is required}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 BOOTSTRAP="${BOOTSTRAP:-2000}"
+ONLY_L="${ONLY_L:-7}"
 
 cd "${PROJECT_DIR}"
 "${PYTHON_BIN}" -u verify_entropy_mechanism.py "${RUN_DIR}" \
-  --L 7 \
+  --L "${ONLY_L}" \
   --min-W 0.8 \
   --max-W 2.5 \
   --fit-W-minima 0.8,1.0,1.2 \

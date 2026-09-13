@@ -1,0 +1,10 @@
+Two-component entropy-mechanism verification v1.0.0
+Run directory: /home/2/kj405942/POLFED_bosons/boson_peak_runs/run_L8_Neqnmax5_8_central80_b50
+Maximum |S-H_Q-S_in|: 7.105e-15 (tolerance 1.000e-10)
+Paired bootstrap replicates: 2000
+W/t range: 0.8..2.5
+
+L=8 N=5 nmax=5: S_R=H_Q, votes H_Q:S_in=2:1, valid predictions=15/18, RMSE(pred)=0.00734414, RMSE(naive M)=0.058626
+L=8 N=6 nmax=6: S_R=H_Q, votes H_Q:S_in=2:1, valid predictions=16/18, RMSE(pred)=0.010609, RMSE(naive M)=0.0534782
+L=8 N=7 nmax=7: S_R=H_Q, votes H_Q:S_in=2:1, valid predictions=18/18, RMSE(pred)=0.0126727, RMSE(naive M)=0.0551845
+L=8 N=8 nmax=8: S_R=H_Q, votes H_Q:S_in=2:1, valid predictions=18/18, RMSE(pred)=0.0115178, RMSE(naive M)=0.0574738

@@ -37,6 +37,36 @@ SECTOR = ("L", "N", "nmax")
 OBSERVABLES = ("S", "H_Q", "S_in", "M")
 
 
+def prb_style() -> Dict[str, Any]:
+    """Compact APS/PRB-like style suitable for a single-column figure."""
+    return {
+        "font.family": "serif",
+        "font.serif": ["STIX Two Text", "Times New Roman", "DejaVu Serif"],
+        "mathtext.fontset": "stix",
+        "font.size": 8.0,
+        "axes.labelsize": 9.0,
+        "axes.titlesize": 8.5,
+        "legend.fontsize": 6.8,
+        "xtick.labelsize": 7.5,
+        "ytick.labelsize": 7.5,
+        "axes.linewidth": 0.8,
+        "lines.linewidth": 1.05,
+        "lines.markersize": 3.8,
+        "xtick.direction": "in",
+        "ytick.direction": "in",
+        "xtick.top": True,
+        "ytick.right": True,
+        "xtick.minor.visible": True,
+        "ytick.minor.visible": True,
+        "xtick.major.width": 0.8,
+        "ytick.major.width": 0.8,
+        "xtick.minor.width": 0.6,
+        "ytick.minor.width": 0.6,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.025,
+    }
+
+
 def finite_quantiles(values: np.ndarray) -> Tuple[float, float, float, float]:
     finite = np.asarray(values, dtype=float)
     finite = finite[np.isfinite(finite)]
@@ -296,6 +326,7 @@ def analyze(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     figures_dir = output_dir / "figures"
+    plt.rcParams.update(prb_style())
     rng = np.random.default_rng(seed)
     curve_rows: List[Dict[str, Any]] = []
     peak_rows: List[Dict[str, Any]] = []
@@ -410,6 +441,12 @@ def analyze(
                 source = peak_lookup.get((float(W), str(name))) if name != "ambiguous" else None
                 row["U_" + label] = float(source["U_peak"]) if source and source["quality_flag"] == "ok" else float("nan")
                 row["kappa_" + label] = -float(source["curvature"]) if source and source["quality_flag"] == "ok" else float("nan")
+                row["U_" + label + "_ci95_low"] = (
+                    float(source["U_peak_ci95_low"]) if source and source["quality_flag"] == "ok" else float("nan")
+                )
+                row["U_" + label + "_ci95_high"] = (
+                    float(source["U_peak_ci95_high"]) if source and source["quality_flag"] == "ok" else float("nan")
+                )
             if all(math.isfinite(row[x]) for x in ("U_R", "U_B", "kappa_R", "kappa_B")) and row["kappa_R"] > 0 and row["kappa_B"] > 0:
                 row["eta_curv"] = row["kappa_R"] / (row["kappa_R"] + row["kappa_B"])
                 row["U_pred"] = row["eta_curv"] * row["U_R"] + (1.0 - row["eta_curv"]) * row["U_B"]
@@ -507,14 +544,41 @@ def analyze(
 
         # Figures: absolute peak comparison, prediction residual, mirror test, and shape comparison.
         p = sector_predictions
-        fig, ax = plt.subplots(figsize=(6.4, 4.5))
-        for column, label, marker in (("U_S", r"$U_S^*$", "s"), ("U_M", r"$U_M^*$", "^"),
-                                      ("U_R", r"$U_R^*$", "o"), ("U_B", r"$U_B^*$", "D"),
-                                      ("U_pred", r"$U_{pred}^*$", "x")):
+        fig, ax = plt.subplots(figsize=(3.45, 2.75))
+        series = (
+            ("U_S", r"$U_S^*$ (ED)", "o", "-", "black", "black"),
+            ("U_pred", r"$U_{\mathrm{pred}}^*$", "x", "--", "#D55E00", "#D55E00"),
+            ("U_M", r"$U_M^*$", "^", ":", "0.42", "0.42"),
+            ("U_R", r"$U_R^*$", "s", "-.", "#0072B2", "white"),
+            ("U_B", r"$U_B^*$", "D", (0, (3, 1, 1, 1)), "#009E73", "white"),
+        )
+        for column, label, marker, linestyle, color, markerface in series:
             valid = np.isfinite(p[column])
-            ax.plot(p.loc[valid, "W_over_t"], p.loc[valid, column], marker=marker, label=label)
-        ax.set(xlabel=r"$W/t$", ylabel=r"$U^*/t$", title=rf"$L={L},\ N={N},\ n_{{max}}={nmax}$")
-        ax.legend(frameon=False, ncol=2)
+            selected_plot = p.loc[valid]
+            if selected_plot.empty:
+                continue
+            low_column = column + "_ci95_low"
+            high_column = column + "_ci95_high"
+            if low_column in selected_plot and high_column in selected_plot:
+                lower = selected_plot[column].to_numpy(dtype=float) - selected_plot[low_column].to_numpy(dtype=float)
+                upper = selected_plot[high_column].to_numpy(dtype=float) - selected_plot[column].to_numpy(dtype=float)
+                yerr = np.vstack((np.maximum(lower, 0.0), np.maximum(upper, 0.0)))
+            else:
+                yerr = None
+            ax.errorbar(
+                selected_plot["W_over_t"], selected_plot[column], yerr=yerr,
+                color=color, marker=marker, linestyle=linestyle, label=label,
+                markerfacecolor=markerface, markeredgecolor=color, markeredgewidth=0.8,
+                capsize=1.6, capthick=0.7, elinewidth=0.65, zorder=4 if column in ("U_S", "U_pred") else 2,
+            )
+        ax.set_xlabel(r"$W/t$")
+        ax.set_ylabel(r"$U^*/t$")
+        ax.text(
+            0.97, 0.04, rf"$L={L},\ N={N},\ n_{{\max}}={nmax}$",
+            transform=ax.transAxes, ha="right", va="bottom",
+        )
+        ax.legend(frameon=False, ncol=2, loc="upper left", columnspacing=0.9, handlelength=2.1)
+        ax.margins(x=0.025)
         save_figure(fig, figures_dir, f"peak_comparison_L{L}_N{N}_nmax{nmax}", dpi)
 
         fig, axes = plt.subplots(2, 1, figsize=(6.4, 5.7), sharex=True, gridspec_kw={"height_ratios": [2, 1]})
