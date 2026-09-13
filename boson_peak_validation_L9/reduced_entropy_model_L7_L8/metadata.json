@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "inputs": [
+    "/home/2/kj405942/POLFED_bosons/boson_peak_runs/run_L7_Neqnmax4_7_central80_b50/entropy_mechanism_verification",
+    "/home/2/kj405942/POLFED_bosons/boson_peak_runs/run_L8_Neqnmax5_8_central80_b50/entropy_mechanism_verification"
+  ],
+  "W_minima": [
+    0.8,
+    1.0,
+    1.2,
+    1.4
+  ]
+}

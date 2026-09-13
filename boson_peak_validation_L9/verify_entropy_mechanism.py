@@ -32,7 +32,7 @@ import pandas as pd
 import boson_peak_core as core
 
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SECTOR = ("L", "N", "nmax")
 OBSERVABLES = ("S", "H_Q", "S_in", "M")
 
@@ -335,6 +335,7 @@ def analyze(
     prediction_rows: List[Dict[str, Any]] = []
     slope_rows: List[Dict[str, Any]] = []
     eta_rows: List[Dict[str, Any]] = []
+    bootstrap_peak_rows: List[Dict[str, Any]] = []
     bootstrap_cache: Dict[Tuple[int, int, int, float, str], Dict[str, np.ndarray]] = {}
     curve_cache: Dict[Tuple[int, int, int, float], Tuple[np.ndarray, Dict[str, np.ndarray]]] = {}
 
@@ -492,6 +493,21 @@ def analyze(
                 row[name + "_ci95_high"] = high
                 row[name + "_bootstrap_valid_fraction"] = fraction
                 bootstrap_cache[(L, N, nmax, float(W), name)] = {"peak": values, "curvature": np.full(bootstrap, np.nan)}
+            for replicate in range(bootstrap):
+                bootstrap_peak_rows.append(
+                    {
+                        "L": L, "N": N, "nmax": nmax, "W_over_t": float(W), "replicate": replicate,
+                        "U_S": float(derived["S"][replicate]),
+                        "U_M": float(derived["M"][replicate]),
+                        "U_R": float(derived["R"][replicate]),
+                        "U_B": float(derived["B"][replicate]),
+                        "kappa_R": float(derived["kR"][replicate]),
+                        "kappa_B": float(derived["kB"][replicate]),
+                        "eta_curv": float(eta_curv[replicate]),
+                        "U_pred": float(pred[replicate]),
+                        "U0_mirror": float(mirror[replicate]),
+                    }
+                )
             prediction_rows.append(row)
 
         sector_predictions = pd.DataFrame(
@@ -640,6 +656,7 @@ def analyze(
     predictions_df = pd.DataFrame(prediction_rows)
     slopes_df = pd.DataFrame(slope_rows)
     eta_df = pd.DataFrame(eta_rows)
+    bootstrap_peaks_df = pd.DataFrame(bootstrap_peak_rows)
     for name, table in (
         ("decomposition_curves.csv", curves_df),
         ("decomposition_peaks.csv", peaks_df),
@@ -650,6 +667,7 @@ def analyze(
         ("eta_comparison.csv", eta_df),
     ):
         table.to_csv(output_dir / name, index=False)
+    bootstrap_peaks_df.to_csv(output_dir / "bootstrap_peaks.csv.gz", index=False, compression="gzip")
 
     summary_lines = [
         "Two-component entropy-mechanism verification v{}".format(VERSION),
