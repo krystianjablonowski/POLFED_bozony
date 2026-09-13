@@ -1,0 +1,7 @@
+Covariance-compensation model v1.0.0
+Hamiltonian: hopping + disorder epsilon in [-W,W] + U*sum n(n-1) (no 1/2)
+Complete tasks: 100/100
+State rows: 600000
+Paired bootstrap replicates: 2000
+ED comparison: /home/2/kj405942/POLFED_bosons/bose_hubbard_covariance_compensation/comparison_data/entropy_peak_points.csv
+Mixing-model comparison: /home/2/kj405942/POLFED_bosons/bose_hubbard_covariance_compensation/comparison_data/peaks_L7_corrected.csv
