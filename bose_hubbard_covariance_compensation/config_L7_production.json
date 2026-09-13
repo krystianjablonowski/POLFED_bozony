@@ -1,0 +1,48 @@
+{
+  "model": {
+    "t": 1.0,
+    "boundary": "open",
+    "interaction": "U_n_nminus1",
+    "sectors": [
+      {"L": 7, "N": 4, "nmax": 4},
+      {"L": 7, "N": 5, "nmax": 5},
+      {"L": 7, "N": 6, "nmax": 6},
+      {"L": 7, "N": 7, "nmax": 7}
+    ]
+  },
+  "disorder": {
+    "distribution": "uniform_minus_W_plus_W",
+    "master_seed": 20260907,
+    "W_values": {"start": 0.1, "stop": 2.5, "step": 0.1}
+  },
+  "selection": {
+    "mode": "closest_count",
+    "center": 0.5,
+    "count": 20
+  },
+  "sampling": {
+    "n_realizations": 300,
+    "block_size": 300,
+    "checkpoint_every": 10
+  },
+  "numerics": {
+    "variance_tolerance": 1e-12,
+    "residual_tolerance": 1e-9,
+    "orthogonality_tolerance": 1e-9,
+    "dense_max": 600,
+    "eigensolver_tolerance": 1e-10
+  },
+  "analysis": {
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": 20260908,
+    "fit_Wmin": 0.8,
+    "fit_Wmax": 2.5,
+    "histogram_W": [0.1, 0.8, 1.7, 2.5]
+  },
+  "paths": {"results_dir": "results_L7_production"},
+  "cluster": {"walltime": "04:00:00", "memory": "6gb"},
+  "comparison": {
+    "ed_peaks_csv": "comparison_data/entropy_peak_points.csv",
+    "model_peaks_csv": "comparison_data/peaks_L7_corrected.csv"
+  }
+}

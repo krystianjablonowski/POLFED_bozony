@@ -1,0 +1,3 @@
+L,N,nmax,W_over_t,observable,U_peak,quality_flag,U_peak_ci_low,U_peak_ci_high
+3,2,2,0.8,M_existing,0.10,ok,0.08,0.12
+3,2,2,1.2,M_existing,0.15,ok,0.13,0.17

@@ -1,0 +1,3 @@
+L,N,nmax,W_over_t,U_S_star_over_t,U_S_ci95_low,U_S_ci95_high,peak_resolved
+3,2,2,0.8,0.10,0.09,0.11,True
+3,2,2,1.2,0.16,0.14,0.18,True

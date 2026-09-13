@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.test_deps/
+_smoke_results/
+results_*/raw/
+results_*/logs/
+results_*/tasks.csv
+results_*/resolved_config.json
+results_*/config.sha256
+results_*/analysis/state_records.csv.gz

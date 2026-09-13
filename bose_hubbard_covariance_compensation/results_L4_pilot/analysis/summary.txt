@@ -1,0 +1,7 @@
+Covariance-compensation model v1.0.0
+Hamiltonian: hopping + disorder epsilon in [-W,W] + U*sum n(n-1) (no 1/2)
+Complete tasks: 25/25
+State rows: 25000
+Paired bootstrap replicates: 1000
+ED comparison: not configured
+Mixing-model comparison: not configured
