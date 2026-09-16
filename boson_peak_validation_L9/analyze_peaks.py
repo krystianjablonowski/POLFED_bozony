@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.signal import savgol_filter
 
 import boson_peak_core as core
 
@@ -24,6 +25,13 @@ def sem(values: np.ndarray) -> float:
     finite = np.asarray(values, dtype=float)
     finite = finite[np.isfinite(finite)]
     return float(np.std(finite, ddof=1) / math.sqrt(finite.size)) if finite.size > 1 else float("nan")
+
+
+def pointwise_sem(matrix: np.ndarray) -> np.ndarray:
+    matrix = np.asarray(matrix, dtype=float)
+    if matrix.shape[0] <= 1:
+        return np.full(matrix.shape[1], np.nan)
+    return np.std(matrix, axis=0, ddof=1) / math.sqrt(matrix.shape[0])
 
 
 def bool_mask(frame: pd.DataFrame, column: str) -> np.ndarray:
@@ -81,6 +89,140 @@ def curve_peak(U: np.ndarray, values: np.ndarray, local_points: int = 5) -> Dict
         "fit_U_min": float(x[0]),
         "fit_U_max": float(x[-1]),
     }
+
+
+def consensus_curve_peak(U: np.ndarray, values: np.ndarray, settings: Dict[str, Any]) -> Dict[str, Any]:
+    """Estimate a shallow maximum and require raw/smoothed estimators to agree."""
+    U = np.asarray(U, dtype=float)
+    values = np.asarray(values, dtype=float)
+    local_points = int(settings.get("local_fit_points", 5))
+    raw = curve_peak(U, values, local_points)
+    requested_window = max(3, int(settings.get("peak_smoothing_points", 7)))
+    window = min(requested_window, U.size if U.size % 2 else U.size - 1)
+    if window % 2 == 0:
+        window -= 1
+    if window >= 3:
+        smoothed_values = savgol_filter(values, window_length=window, polyorder=min(2, window - 1), mode="interp")
+        smoothed = curve_peak(U, smoothed_values, local_points)
+    else:
+        smoothed = dict(raw)
+    spacing = float(np.median(np.diff(np.sort(U)))) if U.size > 1 else float("nan")
+    raw_peak = float(raw["peak"])
+    smoothed_peak = float(smoothed["peak"])
+    disagreement = abs(raw_peak - smoothed_peak)
+    tolerance = float(settings.get("max_peak_estimator_disagreement_steps", 1.5)) * spacing
+    agree = (
+        bool(raw["accepted"])
+        and bool(smoothed["accepted"])
+        and math.isfinite(disagreement)
+        and math.isfinite(tolerance)
+        and disagreement <= tolerance + 1.0e-12
+    )
+    result = dict(smoothed)
+    result.update(
+        {
+            "accepted": bool(smoothed["accepted"] and agree),
+            "raw_peak": raw_peak,
+            "smoothed_peak": smoothed_peak,
+            "raw_fit_accepted": bool(raw["accepted"]),
+            "smoothed_fit_accepted": bool(smoothed["accepted"]),
+            "estimator_disagreement": disagreement,
+            "estimators_agree": bool(agree),
+            "smoothing_points_used": int(window),
+        }
+    )
+    if math.isfinite(smoothed_peak) and U.size:
+        result["grid_index"] = int(np.argmin(np.abs(U - smoothed_peak)))
+    return result
+
+
+def loess_matrix(U: np.ndarray, errors: np.ndarray, grid: np.ndarray, span: int) -> np.ndarray:
+    """Build an inverse-variance-weighted local quadratic LOESS smoother."""
+    U = np.asarray(U, dtype=float)
+    errors = np.asarray(errors, dtype=float)
+    grid = np.asarray(grid, dtype=float)
+    span = max(3, min(int(span), U.size))
+    positive = errors[np.isfinite(errors) & (errors > 0)]
+    fallback = float(np.median(positive)) if positive.size else 1.0
+    usable_errors = np.where(np.isfinite(errors) & (errors > 0), errors, fallback)
+    smoother = np.zeros((grid.size, U.size), dtype=float)
+    for row, target in enumerate(grid):
+        indices = np.argsort(np.abs(U - target))[:span]
+        distance = np.abs(U[indices] - target)
+        radius = float(np.max(distance))
+        if radius == 0.0:
+            smoother[row, indices[0]] = 1.0
+            continue
+        kernel = np.maximum(1.0 - (distance / radius) ** 3, 0.0) ** 3
+        kernel = np.where(kernel > 0.0, kernel, np.finfo(float).eps)
+        weights = kernel / usable_errors[indices] ** 2
+        dx = U[indices] - target
+        design = np.column_stack((np.ones_like(dx), dx, dx**2))
+        normal = design.T @ (weights[:, None] * design)
+        projection = np.asarray([1.0, 0.0, 0.0]) @ np.linalg.pinv(normal)
+        smoother[row, indices] = projection @ (design.T * weights)
+    return smoother
+
+
+def prepare_weighted_loess(U: np.ndarray, matrix: np.ndarray, settings: Dict[str, Any]) -> Dict[str, Any]:
+    U = np.asarray(U, dtype=float)
+    dense_points = max(101, int(settings.get("loess_dense_points", 1001)))
+    span = max(3, int(settings.get("loess_span_points", 9)))
+    grid = np.linspace(float(np.min(U)), float(np.max(U)), dense_points)
+    errors = pointwise_sem(matrix)
+    return {
+        "grid": grid,
+        "smoother": loess_matrix(U, errors, grid, span),
+        "span": min(span, U.size),
+        "dense_points": dense_points,
+        "pointwise_sem": errors,
+    }
+
+
+def weighted_loess_peak(
+    U: np.ndarray,
+    values: np.ndarray,
+    prepared: Dict[str, Any],
+    settings: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Locate a maximum of an uncertainty-weighted LOESS curve."""
+    U = np.asarray(U, dtype=float)
+    grid = np.asarray(prepared["grid"], dtype=float)
+    fitted = np.asarray(prepared["smoother"], dtype=float) @ np.asarray(values, dtype=float)
+    dense_estimate = curve_peak(grid, fitted, int(settings.get("local_fit_points", 5)))
+    peak = float(dense_estimate["peak"])
+    return {
+        **dense_estimate,
+        "grid_index": int(np.argmin(np.abs(U - peak))),
+        "peak_method": "weighted_loess_quadratic",
+        "raw_peak": peak,
+        "smoothed_peak": peak,
+        "raw_fit_accepted": bool(dense_estimate["accepted"]),
+        "smoothed_fit_accepted": bool(dense_estimate["accepted"]),
+        "estimator_disagreement": 0.0,
+        "estimators_agree": bool(dense_estimate["accepted"]),
+        "smoothing_points_used": int(prepared["span"]),
+        "loess_grid": grid,
+        "loess_fitted": fitted,
+    }
+
+
+def entropy_peak_estimate(
+    U: np.ndarray,
+    values: np.ndarray,
+    matrix: np.ndarray,
+    settings: Dict[str, Any],
+    prepared: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    method = str(settings.get("peak_method", "weighted_loess")).replace("_", "-").lower()
+    if method == "weighted-loess":
+        prepared = prepared if prepared is not None else prepare_weighted_loess(U, matrix, settings)
+        return weighted_loess_peak(U, values, prepared, settings)
+    if method == "consensus":
+        result = consensus_curve_peak(U, values, settings)
+        result["peak_method"] = "local_quadratic_savgol_consensus"
+        return result
+    raise ValueError("Unknown entropy peak method: {}".format(method))
 
 
 def pivot_group(frame: pd.DataFrame, value: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -151,8 +293,15 @@ def theory_lookup(run_dir: Path) -> Dict[Tuple[int, int, int, float], Dict[str, 
 
 def bootstrap_sector(
     sector_frame: pd.DataFrame, sector_mixing: pd.DataFrame, replicates: int, rng: np.random.Generator,
-    local_points: int,
+    peak_settings: Any,
 ) -> Dict[float, Dict[str, np.ndarray]]:
+    settings = (
+        dict(peak_settings)
+        if isinstance(peak_settings, dict)
+        else {"local_fit_points": int(peak_settings), "peak_smoothing_points": 7,
+              "max_peak_estimator_disagreement_steps": 1.5, "peak_method": "consensus"}
+    )
+    local_points = int(settings.get("local_fit_points", 5))
     by_W = {float(W): group for W, group in sector_frame.groupby("W_over_t")}
     mixing_by_W = {float(W): group for W, group in sector_mixing.groupby("W_over_t")}
     common_ids: Optional[set] = None
@@ -168,10 +317,14 @@ def bootstrap_sector(
         return output
     entropy_data = {}
     mixing_data = {}
+    loess_prepared = {}
     for W, group in by_W.items():
         pivot = group.pivot_table(index="realization", columns="U_over_t", values="entropy_norm", aggfunc="first")
         pivot = pivot.reindex(ids_array).dropna(axis=0, how="any").sort_index(axis=1)
         entropy_data[W] = (pivot.columns.to_numpy(dtype=float), pivot.to_numpy(dtype=float))
+        if str(settings.get("peak_method", "weighted_loess")).replace("_", "-").lower() == "weighted-loess":
+            eU, ematrix = entropy_data[W]
+            loess_prepared[W] = prepare_weighted_loess(eU, ematrix, settings)
         mgroup = mixing_by_W[W]
         mpivot = mgroup.pivot_table(index="realization", columns="U_over_t", values="sample_mixing", aggfunc="first")
         mpivot = mpivot.reindex(ids_array).dropna(axis=0, how="any").sort_index(axis=1)
@@ -180,7 +333,9 @@ def bootstrap_sector(
         selected = rng.integers(0, ids_array.size, size=ids_array.size)
         for W in by_W:
             U, matrix = entropy_data[W]
-            estimate = curve_peak(U, np.mean(matrix[selected], axis=0), local_points)
+            estimate = entropy_peak_estimate(
+                U, np.mean(matrix[selected], axis=0), matrix, settings, loess_prepared.get(W)
+            )
             if estimate["accepted"]:
                 output[W]["entropy_peak"][replicate] = estimate["peak"]
                 output[W]["curvature"][replicate] = estimate["curvature"]
@@ -210,7 +365,8 @@ def analyze_group(
     ids, U, matrix = pivot_group(group, "entropy_norm")
     _, mixing_U, mixing_matrix = pivot_group(mixing_group, "sample_mixing")
     means = np.mean(matrix, axis=0)
-    estimate = curve_peak(U, means, int(settings.get("local_fit_points", 5)))
+    legacy_estimate = consensus_curve_peak(U, means, settings)
+    estimate = entropy_peak_estimate(U, means, matrix, settings)
     peak_index = int(estimate["grid_index"])
     plateau_low, plateau_high, plateau_points, plateau_zero = plateau_interval(U, matrix, peak_index)
     zero_candidates = np.flatnonzero(np.isclose(U, 0.0, atol=1.0e-12, rtol=0.0))
@@ -248,6 +404,7 @@ def analyze_group(
     flat_curvature = math.isfinite(curvature_high) and curvature_high >= 0.0
     resolved = (
         bool(estimate["accepted"])
+        and bool(estimate["estimators_agree"])
         and not bool(estimate["boundary"])
         and not plateau_zero
         and plateau_points <= max_plateau_points
@@ -263,8 +420,10 @@ def analyze_group(
     if resolved:
         agreement = "consistent" if low - grid_step <= U_M <= high + grid_step else "inconsistent"
     reasons = []
-    if not bool(estimate["accepted"]):
+    if not bool(estimate["raw_fit_accepted"]) or not bool(estimate["smoothed_fit_accepted"]):
         reasons.append("local_fit_rejected")
+    if not bool(estimate["estimators_agree"]):
+        reasons.append("peak_estimators_disagree")
     if bool(estimate["boundary"]):
         reasons.append("scan_boundary")
     if plateau_zero:
@@ -289,7 +448,16 @@ def analyze_group(
         "U_M_star_over_t": U_M,
         "U_M_same_samples_over_t": float(mix_median if math.isfinite(mix_median) else mix_estimate["grid_peak"]),
         "U_M_same_samples_ci95_low": mix_low, "U_M_same_samples_ci95_high": mix_high,
+        "entropy_peak_method": str(estimate.get("peak_method", "unknown")),
+        "U_S_loess_over_t": float(estimate["peak"]) if str(estimate.get("peak_method", "")).startswith("weighted_loess") else float("nan"),
+        "loess_span_points_used": int(estimate.get("smoothing_points_used", 0)) if str(estimate.get("peak_method", "")).startswith("weighted_loess") else 0,
+        "loess_dense_points": int(settings.get("loess_dense_points", 1001)),
         "U_S_candidate_over_t": float(estimate["peak"]),
+        "U_S_local_quadratic_over_t": float(legacy_estimate["raw_peak"]),
+        "U_S_smoothed_over_t": float(legacy_estimate["smoothed_peak"]),
+        "peak_estimator_disagreement_over_t": float(legacy_estimate["estimator_disagreement"]),
+        "peak_estimators_agree": bool(estimate["estimators_agree"]),
+        "peak_smoothing_points_used": int(legacy_estimate["smoothing_points_used"]),
         "U_S_grid_max_over_t": float(estimate["grid_peak"]),
         "U_S_star_over_t": U_S,
         "U_S_ci95_low": low, "U_S_ci95_high": high,
@@ -527,11 +695,31 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--bootstrap", type=int)
+    parser.add_argument("--peak-smoothing-points", type=int,
+                        help="odd Savitzky-Golay window used by the entropy-peak estimator")
+    parser.add_argument("--max-estimator-disagreement-steps", type=float,
+                        help="largest raw/smoothed peak separation, in U-grid steps")
+    parser.add_argument("--peak-method", choices=("weighted-loess", "consensus"),
+                        help="entropy maximum estimator (default: value from the run config)")
+    parser.add_argument("--loess-span", type=int,
+                        help="neighboring U points in each local quadratic LOESS fit")
+    parser.add_argument("--loess-dense-points", type=int,
+                        help="dense points used to locate the LOESS maximum")
     args = parser.parse_args()
     run_dir = args.run_dir.resolve()
     manifest = json.loads((run_dir / "run_manifest.json").read_text(encoding="utf-8"))
     config = manifest["config"]
-    settings = config["analysis"]
+    settings = dict(config["analysis"])
+    if args.peak_smoothing_points is not None:
+        settings["peak_smoothing_points"] = args.peak_smoothing_points
+    if args.max_estimator_disagreement_steps is not None:
+        settings["max_peak_estimator_disagreement_steps"] = args.max_estimator_disagreement_steps
+    if args.peak_method is not None:
+        settings["peak_method"] = args.peak_method
+    if args.loess_span is not None:
+        settings["loess_span_points"] = args.loess_span
+    if args.loess_dense_points is not None:
+        settings["loess_dense_points"] = args.loess_dense_points
     replicates = int(args.bootstrap if args.bootstrap is not None else settings.get("bootstrap", 2000))
     frame = pd.read_csv(run_dir / "ed_observables_by_realization.csv")
     mixing = pd.read_csv(run_dir / "sample_mixing_curves.csv")
@@ -549,7 +737,7 @@ def main() -> None:
             (mixing["L"] == sector_key[0]) & (mixing["N"] == sector_key[1]) & (mixing["nmax"] == sector_key[2])
         ]
         boot = bootstrap_sector(
-            sector_frame, sector_mixing, replicates, rng, int(settings.get("local_fit_points", 5))
+            sector_frame, sector_mixing, replicates, rng, settings
         )
         bootstrap_cache[sector_key] = boot
         for W, group in sector_frame.groupby("W_over_t", sort=True):
@@ -558,6 +746,23 @@ def main() -> None:
             peak_rows.append(analyze_group(group, mixing_group, boot[float(W)], theory, settings))
     peaks = pd.DataFrame(peak_rows).sort_values(GROUP)
     peaks.to_csv(run_dir / "peak_summary.csv", index=False)
+    entropy_peak_columns = [
+        "L", "N", "nmax", "filling", "W_over_t", "realizations", "U_points",
+        "entropy_peak_method", "U_S_loess_over_t", "U_S_grid_max_over_t",
+        "U_S_local_quadratic_over_t", "U_S_smoothed_over_t",
+        "U_S_candidate_over_t", "U_S_star_over_t", "U_S_ci95_low", "U_S_ci95_high",
+        "bootstrap_valid_fraction", "bootstrap_ci_width_over_t", "grid_error_over_t",
+        "peak_resolved", "peak_at_boundary", "plateau_U_low_over_t", "plateau_U_high_over_t",
+        "peak_height_delta_entropy_norm", "peak_height_paired_sem", "peak_significance_z",
+        "curvature", "unresolved_reasons",
+    ]
+    peaks[entropy_peak_columns].to_csv(run_dir / "entropy_peak_points.csv", index=False)
+    mixing_peak_columns = [
+        "L", "N", "nmax", "filling", "W_over_t", "realizations",
+        "U_M_star_over_t", "U_M_same_samples_over_t",
+        "U_M_same_samples_ci95_low", "U_M_same_samples_ci95_high",
+    ]
+    peaks[mixing_peak_columns].to_csv(run_dir / "mixing_function_peak_points.csv", index=False)
 
     coefficients = pd.read_csv(run_dir / "theory_coefficients.csv")
     theory_peaks = pd.read_csv(run_dir / "theory_peaks.csv")
@@ -634,6 +839,8 @@ def main() -> None:
     write_validation_report(run_dir, peaks, fits, coefficients, asymptotic)
     print("Saved averaged curves: {}".format(run_dir / "ed_averaged_curves.csv"))
     print("Saved peak summary: {}".format(run_dir / "peak_summary.csv"))
+    print("Saved entropy peaks: {}".format(run_dir / "entropy_peak_points.csv"))
+    print("Saved mixing peaks: {}".format(run_dir / "mixing_function_peak_points.csv"))
     print("Saved scan proposals: {}".format(run_dir / "scan_extension_proposals.csv"))
     print("Saved report: {}".format(run_dir / "VALIDATION_REPORT.md"))
 

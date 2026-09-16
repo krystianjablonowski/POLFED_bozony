@@ -297,6 +297,9 @@ def plot_peak_estimator_diagnostics(peaks: pd.DataFrame, output: Path, dpi: int)
                 color="0.45", ls=":", marker="x", label="local quadratic")
         ax.plot(group["W_over_t"], group["U_S_smoothed_over_t"],
                 color="#0072B2", ls="-", marker="o", label="smoothed estimator")
+        if "U_S_loess_over_t" in group.columns and group["U_S_loess_over_t"].notna().any():
+            ax.plot(group["W_over_t"], group["U_S_loess_over_t"],
+                    color="#009E73", ls="--", marker="s", label="weighted LOESS")
         ax.set_xlabel(r"$W/t$")
         if index % 2 == 0:
             ax.set_ylabel(r"$U_S^*/t$")

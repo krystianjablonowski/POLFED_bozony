@@ -272,9 +272,25 @@ cd ~/POLFED_bosons/boson_peak_validation_L9
 RUN=~/POLFED_bosons/boson_peak_runs/run_pilot
 
 python merge_results.py "$RUN"
-python analyze_peaks.py "$RUN" --bootstrap 2000
+python analyze_peaks.py "$RUN" --bootstrap 2000 \
+  --peak-method weighted-loess --loess-span 9 --loess-dense-points 1001
 python plot_results.py "$RUN"
 ```
+
+The default entropy-maximum estimator is an inverse-variance-weighted local
+quadratic LOESS smoother. Pointwise weights are proportional to
+`1 / SEM(U)^2`. Its confidence interval is not obtained by treating U points
+as independent: the analysis resamples complete disorder realizations, uses
+the same realization indices along the whole U curve, and repeats the LOESS
+maximum search. This paired bootstrap preserves correlations between U
+points. `peak_summary.csv` stores `U_S_loess_over_t`, the bootstrap median in
+`U_S_star_over_t`, its 95% interval, and the older local-quadratic/Savitzky-
+Golay estimates for diagnostics. Use `--peak-method consensus` to reproduce
+the previous estimator.
+
+Each analysis also writes compact working tables `entropy_peak_points.csv`
+and `mixing_function_peak_points.csv`; they are selected, documented subsets
+of the complete `peak_summary.csv` table.
 
 ## Two-component entropy verification
 
