@@ -16,7 +16,9 @@ import csv
 import json
 import math
 import os
+import subprocess
 import sys
+import tempfile
 import time
 import traceback
 from pathlib import Path
@@ -180,7 +182,12 @@ def estimated_memory_mb(structure: core.BosonStructure, config: Dict[str, Any]) 
     vectors_bytes = dim * nev * 8
     backend = solver.get("backend", "auto")
     dense = backend == "dense" or (backend == "auto" and dim <= int(config["model"].get("dense_max", 5000)))
-    if dense:
+    if backend == "polfed":
+        # Eigenvectors dominate the retained memory. POLFED also keeps filtered
+        # Krylov workspaces, for which a factor of two is a useful lower-bound
+        # estimate; the timing pilot remains authoritative on the cluster.
+        estimate = 2.0 * vectors_bytes + 8.0 * csr_bytes
+    elif dense:
         estimate = 3.5 * dim * dim * 8 + vectors_bytes + csr_bytes
     else:
         estimate = float(solver.get("shift_invert_memory_factor", 18.0)) * csr_bytes + 3.0 * vectors_bytes
@@ -362,6 +369,119 @@ def solve_one_U(
     }
 
 
+def _parse_polfed_output(path: Path, U_over_t: float, channels: Sequence[core.Channel],
+                         epsilon: np.ndarray, t: float) -> Dict[str, Any]:
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    if len(rows) != 1:
+        raise RuntimeError("POLFED helper returned {} rows, expected one".format(len(rows)))
+    raw = rows[0]
+    p_q = np.asarray([float(x) for x in raw["P_Q"].split(";") if x], dtype=float)
+    return {
+        "U_over_t": float(U_over_t),
+        "entropy": float(raw["entropy"]),
+        "entropy_norm": float(raw["entropy_norm"]),
+        "entropy2": float(raw["entropy2"]),
+        "entropy2_norm": float(raw["entropy2_norm"]),
+        "IPR": float(raw["IPR"]),
+        "gap_ratio": float(raw["gap_ratio"]),
+        "gap_ratio_count": int(raw["gap_ratio_count"]),
+        "Q_mean": float(raw["Q_mean"]),
+        "Q_variance": float(raw["Q_variance"]),
+        "H_Q": float(raw["H_Q"]),
+        "S_intra_Q": float(raw["S_intra_Q"]),
+        "entropy_identity_error": float(raw["entropy_identity_error"]),
+        "P_Q": p_q,
+        "sample_mixing": float(core.sample_mixing(np.asarray([U_over_t * t]), epsilon, channels, t)[0]),
+        "E_min_over_t": float(raw["E_min_over_t"]),
+        "E_max_over_t": float(raw["E_max_over_t"]),
+        "sigma_over_t": float(raw["sigma_over_t"]),
+        "solver_time_s": float(raw["solver_time_s"]),
+        "peak_memory_MB": core.current_peak_memory_mb(),
+        "residual_max": float(raw["residual_max"]),
+        "orthogonality_error": float(raw["orthogonality_error"]),
+        "solver_attempts": 1,
+        "selected_states": int(raw["selected_states"]),
+        "solver_backend": "polfed",
+        "solver_retry_log_json": "[]",
+    }
+
+
+def solve_one_U_polfed(
+    structure: core.BosonStructure,
+    nmax: int,
+    channels: Sequence[core.Channel],
+    epsilon: np.ndarray,
+    U_over_t: float,
+    W_over_t: float,
+    config: Dict[str, Any],
+    seed: int,
+) -> Dict[str, Any]:
+    del W_over_t
+    solver = config["eigensolver"]
+    source_dir = Path(__file__).resolve().parent
+    helper = source_dir / "polfed_entropy_solver.jl"
+    if not helper.exists():
+        raise RuntimeError("Missing POLFED Julia helper: {}".format(helper))
+    project = Path(str(solver.get("polfed_project", source_dir.parent)))
+    if not project.is_absolute():
+        project = (source_dir / project).resolve()
+    julia = str(solver.get("polfed_julia", "julia"))
+    selected = core.selected_state_count(structure.dim, solver)
+    configured = core.requested_eigenpair_count(structure.dim, solver)
+    oversampling = float(solver.get("polfed_oversampling", 1.2))
+    minimum_extra = int(solver.get("polfed_minimum_extra_states", 50))
+    requested = min(
+        structure.dim - 1,
+        max(configured, int(np.ceil(selected * oversampling)), selected + minimum_extra),
+    )
+    with tempfile.TemporaryDirectory(prefix="boson_polfed_") as temporary:
+        temporary_path = Path(temporary)
+        epsilon_path = temporary_path / "epsilon.txt"
+        output_path = temporary_path / "observables.tsv"
+        np.savetxt(str(epsilon_path), np.asarray(epsilon, dtype=float), fmt="%.17g")
+        attempts = max(1, int(solver.get("polfed_attempts", 3)))
+        attempt_outputs = []
+        completed = None
+        for attempt in range(attempts):
+            attempt_seed = (int(seed) + attempt * 104729) % 2147483647
+            base_eigentol = float(solver.get("polfed_eigentol", 1.0e-8))
+            maximum_eigentol = float(solver.get("polfed_maximum_eigentol", 1.0e-7))
+            attempt_eigentol = min(base_eigentol * (10.0 ** attempt), maximum_eigentol)
+            command = [
+                julia, "--project={}".format(project), str(helper),
+                "--L", str(structure.L), "--N", str(int(np.sum(structure.occupations[0]))),
+                "--nmax", str(int(nmax)),
+                "--t", "{:.17g}".format(float(config["model"].get("t", 1.0))),
+                "--U", "{:.17g}".format(U_over_t * float(config["model"].get("t", 1.0))),
+                "--epsilon-file", str(epsilon_path), "--output", str(output_path),
+                "--howmany", str(requested), "--selected", str(selected),
+                "--target", str(solver.get("polfed_target", "middle")),
+                "--block", str(int(solver.get("polfed_block", 4))),
+                "--seed", str(attempt_seed),
+                "--overestimate-iters", str(float(solver.get("polfed_overestimate_iters", 4.0))),
+                "--eigentol", str(attempt_eigentol),
+                "--gap-edge-discard", str(int(solver.get("gap_edge_discard", 2))),
+            ]
+            completed = subprocess.run(
+                command, cwd=str(project), text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, check=False,
+            )
+            attempt_outputs.append(completed.stdout[-12000:])
+            if completed.returncode == 0 and output_path.exists():
+                break
+        if completed is None or completed.returncode != 0:
+            raise RuntimeError(
+                "POLFED Julia helper failed at U/t={:.12g} after {} attempt(s):\n{}".format(
+                    U_over_t, attempts, "\n--- retry ---\n".join(attempt_outputs)
+                )
+            )
+        if not output_path.exists():
+            raise RuntimeError("POLFED helper produced no output:\n{}".format(completed.stdout[-12000:]))
+        return _parse_polfed_output(output_path, U_over_t, channels, epsilon,
+                                    float(config["model"].get("t", 1.0)))
+
+
 def realization_is_complete(path: Path, expected_hash: str, U_values: Sequence[float]) -> bool:
     try:
         with np.load(str(path), allow_pickle=False) as data:
@@ -404,7 +524,7 @@ def process_realization(
     if (
         missing and int(task["L"]) == 6 and realization == 0
         and bool(config["ed"].get("validate_L6_dense_sparse", True)) and not validation
-        and str(config["eigensolver"].get("backend", "auto")) != "dense"
+        and str(config["eigensolver"].get("backend", "auto")) in ("auto", "scipy")
     ):
         validation = core.validate_dense_sparse(structure, missing[0] * t, epsilon, config["eigensolver"])
         limits = config["ed"].get("L6_validation_tolerances", {})
@@ -413,7 +533,17 @@ def process_realization(
         if validation["entropy_error"] > float(limits.get("entropy", 1.0e-7)):
             raise RuntimeError("L6 sparse/dense entropy validation failed")
     for U in missing:
-        row = solve_one_U(structure, channels, epsilon, U, task["W_over_t"], config)
+        if str(config["eigensolver"].get("backend", "auto")) == "polfed":
+            solver_seed = np.random.SeedSequence(
+                [master_seed, int(task["L"]), int(task["N"]), int(task["nmax"]), realization,
+                 int(round(U * 1.0e9))]
+            ).generate_state(1)[0]
+            row = solve_one_U_polfed(
+                structure, int(task["nmax"]), channels, epsilon, U,
+                task["W_over_t"], config, int(solver_seed)
+            )
+        else:
+            row = solve_one_U(structure, channels, epsilon, U, task["W_over_t"], config)
         arrays = append_row(arrays, row)
         arrays = sort_result_arrays(arrays)
         completed_now = all(
