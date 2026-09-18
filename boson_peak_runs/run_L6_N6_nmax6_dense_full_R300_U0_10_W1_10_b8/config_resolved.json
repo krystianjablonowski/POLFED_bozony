@@ -1,0 +1,140 @@
+{
+  "analysis": {
+    "bootstrap": 2000,
+    "bootstrap_seed": 20260908,
+    "entropy_identity_tol": 1e-09,
+    "figure_dpi": 300,
+    "local_fit_points": 5,
+    "loess_dense_points": 1001,
+    "loess_span_points": 9,
+    "max_ci_width_fraction_scan": 0.6,
+    "max_peak_estimator_disagreement_steps": 1.5,
+    "max_plateau_points": 3,
+    "max_required_realizations": 500,
+    "min_bootstrap_valid_fraction": 0.5,
+    "min_peak_significance_z": 2.0,
+    "peak_method": "weighted_loess",
+    "peak_smoothing_points": 7
+  },
+  "cluster": {
+    "array_concurrency": 380,
+    "cpus_per_task": 4,
+    "memory": "8gb",
+    "python": "python",
+    "walltime": "04:00:00"
+  },
+  "ed": {
+    "L6_validation_tolerances": {
+      "energy": 1e-08,
+      "entropy": 1e-07
+    },
+    "U_grid": {
+      "absolute_half_width_over_t": 0.25,
+      "mode": "explicit",
+      "points": 9,
+      "relative_half_width": 0.5,
+      "round_decimals": 8,
+      "values": [
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0,
+        6.0,
+        7.0,
+        8.0,
+        9.0,
+        10.0
+      ]
+    },
+    "W_values": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      6.0,
+      7.0,
+      8.0,
+      9.0,
+      10.0
+    ],
+    "master_seed": 20260907,
+    "realization_block_size": 8,
+    "realizations": 300,
+    "sectors": [
+      {
+        "L": 6,
+        "N": 6,
+        "nmax": 6
+      }
+    ],
+    "store_spectra": false,
+    "validate_L6_dense_sparse": true
+  },
+  "eigensolver": {
+    "backend": "dense",
+    "gap_edge_discard": 2,
+    "maxiter": 30000,
+    "n_states": 462,
+    "ncv": 96,
+    "ncv_retry_growth": 36,
+    "nev": 462,
+    "orthogonality_tol": 1e-08,
+    "polfed_attempts": 3,
+    "polfed_block": 4,
+    "polfed_eigentol": 1e-08,
+    "polfed_julia": "julia",
+    "polfed_maximum_eigentol": 1e-07,
+    "polfed_minimum_extra_states": 50,
+    "polfed_overestimate_iters": 4.0,
+    "polfed_oversampling": 1.2,
+    "polfed_project": "..",
+    "polfed_target": "middle",
+    "residual_tol": 1e-09,
+    "retries": 3,
+    "shift_invert_memory_factor": 18.0,
+    "sigma_shift_fraction": 1e-08,
+    "tol": 1e-10
+  },
+  "model": {
+    "boundary": "open",
+    "dense_max": 5000,
+    "t": 1.0
+  },
+  "paths": {
+    "theory_output_dir": "theory_stage_A"
+  },
+  "theory": {
+    "W_linear_values": [
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      1.0,
+      2.0,
+      4.0,
+      8.0,
+      12.0,
+      16.0,
+      24.0,
+      32.0
+    ],
+    "W_log_max": 32.0,
+    "W_log_min": 0.1,
+    "W_log_points": 61,
+    "peak_U_max_per_W": 2.0,
+    "peak_U_min_max_over_t": 4.0,
+    "peak_grid_points": 3001,
+    "peak_max_expansions": 3,
+    "sectors": [
+      {
+        "L": 6,
+        "N": 6,
+        "nmax": 6
+      }
+    ],
+    "standard_sector_set": false
+  }
+}

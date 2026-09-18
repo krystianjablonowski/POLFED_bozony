@@ -153,7 +153,7 @@ def plot_entropy_curves(
             y = curve[value_column].to_numpy(dtype=float)
             error = curve[error_column].to_numpy(dtype=float)
             color = cmap(norm(float(W)))
-            ax.plot(x, y, color=color, marker="o", markersize=2.7,
+            ax.plot(x, y, color=color, marker="o", markersize=2.2,
                     markevery=1)
             ax.fill_between(x, y - error, y + error, color=color, alpha=0.12, linewidth=0)
             row = peaks[(peaks["L"] == L) & (peaks["N"] == N) & (peaks["nmax"] == nmax) & np.isclose(peaks["W_over_t"], W)]
@@ -195,6 +195,38 @@ def plot_entropy_curves(
     fig.subplots_adjust(wspace=0.22, hspace=0.30, right=0.84, top=0.92)
     common_colorbar(fig, axes, norm, cmap, r"$W/t$")
     save_figure(fig, output, stem, dpi)
+
+
+def plot_gap_ratio_curves(curves: pd.DataFrame, output: Path, dpi: int) -> None:
+    """Plot <r>(W) at fixed U for every sector present in the run."""
+    required = {"gap_ratio_mean", "gap_ratio_sem"}
+    if not required.issubset(curves.columns):
+        return
+    sectors = list(curves.groupby(["L", "N", "nmax"], sort=True))
+    if not sectors:
+        return
+    fig, axes = grid_axes(len(sectors), sharex=False, sharey=True)
+    _, norm, cmap = colors_for(curves["U_over_t"].unique())
+    for index, ((L, N, nmax), sector) in enumerate(sectors):
+        ax = axes[index]
+        for U, curve in sector.groupby("U_over_t", sort=True):
+            curve = curve.sort_values("W_over_t")
+            x = curve["W_over_t"].to_numpy(dtype=float)
+            y = curve["gap_ratio_mean"].to_numpy(dtype=float)
+            error = curve["gap_ratio_sem"].to_numpy(dtype=float)
+            color = cmap(norm(float(U)))
+            ax.plot(x, y, color=color, marker="o", markersize=2.2, markevery=1)
+            ax.fill_between(x, y - error, y + error, color=color, alpha=0.10, linewidth=0)
+        ax.axhline(GOE, color="0.35", lw=0.9, ls="--")
+        ax.axhline(POISSON, color="0.35", lw=0.9, ls=":")
+        ax.set_xlabel(r"$W/t$")
+        if index % 2 == 0:
+            ax.set_ylabel(r"$\langle r\rangle$")
+        panel_label(ax, index)
+        sector_text(ax, int(L), int(N), int(nmax))
+    fig.subplots_adjust(wspace=0.25, hspace=0.28, right=0.86)
+    common_colorbar(fig, axes, norm, cmap, r"$U/t$")
+    save_figure(fig, output, "gap_ratio_vs_W", dpi)
 
 
 def plot_peak_positions(peaks: pd.DataFrame, theory: pd.DataFrame, output: Path, dpi: int) -> None:
@@ -444,7 +476,8 @@ def plot_entropy_decomposition(curves: pd.DataFrame, output: Path, dpi: int) -> 
         group = group.sort_values("U_over_t")
         for field_index, (ax, (field, _)) in enumerate(zip(axes, fields)):
             values = group[field] / log_dimension if field_index < 2 else group[field]
-            ax.plot(group["U_over_t"], values, color=cmap(norm(float(W))), marker=MARKERS[line_index % len(MARKERS)],
+            ax.plot(group["U_over_t"], values, color=cmap(norm(float(W))),
+                    marker=MARKERS[line_index % len(MARKERS)], markersize=2.2,
                     markevery=1)
     for index, (ax, (_, label)) in enumerate(zip(axes, fields)):
         ax.set_xlabel(r"$U/t$")
@@ -495,6 +528,7 @@ def main() -> None:
             "entropy_norm_mean", "entropy_norm_sem",
             r"$S_F/\ln D$", "entropy_absolute_curves",
         )
+        plot_gap_ratio_curves(curves, output, dpi)
         plot_peak_positions(peaks, theory, output, dpi)
         plot_peak_difference(peaks, output, dpi)
         plot_peak_estimator_diagnostics(peaks, output, dpi)
