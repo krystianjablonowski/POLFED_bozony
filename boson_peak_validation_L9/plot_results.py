@@ -154,7 +154,7 @@ def plot_entropy_curves(
             error = curve[error_column].to_numpy(dtype=float)
             color = cmap(norm(float(W)))
             ax.plot(x, y, color=color, marker="o", markersize=2.7,
-                    markevery=max(1, len(x) // 9))
+                    markevery=1)
             ax.fill_between(x, y - error, y + error, color=color, alpha=0.12, linewidth=0)
             row = peaks[(peaks["L"] == L) & (peaks["N"] == N) & (peaks["nmax"] == nmax) & np.isclose(peaks["W_over_t"], W)]
             if not row.empty:
@@ -445,7 +445,7 @@ def plot_entropy_decomposition(curves: pd.DataFrame, output: Path, dpi: int) -> 
         for field_index, (ax, (field, _)) in enumerate(zip(axes, fields)):
             values = group[field] / log_dimension if field_index < 2 else group[field]
             ax.plot(group["U_over_t"], values, color=cmap(norm(float(W))), marker=MARKERS[line_index % len(MARKERS)],
-                    markevery=max(1, len(group) // 8))
+                    markevery=1)
     for index, (ax, (_, label)) in enumerate(zip(axes, fields)):
         ax.set_xlabel(r"$U/t$")
         ax.set_ylabel(label)
