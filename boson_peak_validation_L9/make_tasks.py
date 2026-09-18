@@ -93,6 +93,7 @@ def write_scripts(output: Path, config_snapshot: Path, task_count: int, config: 
 
 set -euo pipefail
 cd {source_dir}
+export JULIA_NUM_THREADS={cpus}
 export OMP_NUM_THREADS={cpus}
 export OPENBLAS_NUM_THREADS={cpus}
 export MKL_NUM_THREADS={cpus}
@@ -124,6 +125,7 @@ fi
 
 set -euo pipefail
 cd {source_dir}
+export JULIA_NUM_THREADS={cpus}
 export OMP_NUM_THREADS={cpus}
 export OPENBLAS_NUM_THREADS={cpus}
 export MKL_NUM_THREADS={cpus}
